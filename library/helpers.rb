@@ -161,17 +161,18 @@ module Locking_Resource
 
     #
     # Function to identify start time of a process
-    # Input paramater: string to identify the process through pgrep command
-    # Returned value : The starttime for the process. If multiple instances are
-    # returned from pgrep command, time returned will be the earliest time of
-    # all the instances
+    # Input: process_identifier - "pgrep -f" compatible process search string
+    # Returns: A Ruby Time object representing the processes start time or nil
+    # Note:
+    # * If multiple instances are returned from pgrep(1), the time returned
+    #   will be the earliest time of all the instances
+    # * If the process can not be found, nil is returned
     #
     def process_start_time(process_identifier)
       require 'time'
       begin
-        cmd = shell_out!("pgrep -f #{process_identifier}",
-                                        {:retuns => [0, 1]}
-                                       )
+        cmd = shell_out!("pgrep -f \"#{process_identifier}\"",
+                                        {:returns => [0, 1]})
         # raise for any error
         raise cmd.stderr if !cmd.stderr.empty?
 
@@ -179,7 +180,7 @@ module Locking_Resource
           return nil
         else
           target_process_pid_arr = cmd.stdout.strip.split("\n").map do |pid|
-            (shell_out!("ps --no-header -o start_time #{pid}").stdout.strip
+            (shell_out!("ps --no-header -o lstart #{pid}").stdout.strip
           end
           start_time_arr = Array.new()
           target_process_pid_arr.each do |t|
@@ -191,12 +192,13 @@ module Locking_Resource
         end
       end
     end
+
     #
     # Function to check whether a process was started manually after restart of
     # the process failed during prev chef client run
-    # Input paramaters : Last restart failure time, string to identify the
-    #                    process
-    # Returned value   : true or false
+    # Input: restart_failure_time - Last restart failure time
+    #        process_identifier - string to identify the process
+    # Returns: true (the process restarted since failing) or false (it did not)
     #
     def process_restarted_after_failure?(restart_failure_time,
                                          process_identifier)
