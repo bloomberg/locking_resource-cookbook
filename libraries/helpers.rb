@@ -157,6 +157,7 @@ module Locking_Resource
         else
           return "#{root}/#{lock_name}"
         end
+      end
     end
 
     #
@@ -172,20 +173,22 @@ module Locking_Resource
       require 'time'
       begin
         cmd = shell_out!("pgrep -f \"#{process_identifier}\"",
-                                        {:returns => [0, 1]})
+                         {:returns => [0, 1]})
         # raise for any error
+        puts "XXX #{cmd.stderr}, XXX #{cmd.stdout}"
         raise cmd.stderr if !cmd.stderr.empty?
 
         if cmd.stdout.strip.empty?
           return nil
         else
-          target_process_pid_arr = cmd.stdout.strip.split("\n").map do |pid|
-            (shell_out!("ps --no-header -o lstart #{pid}").stdout.strip
-          end
-          start_time_arr = Array.new()
-          target_process_pid_arr.each do |t|
+          start_time_arr = cmd.stdout.strip.split("\n").map do |pid|
+            cmd = shell_out!("ps --no-header -o lstart #{pid}",
+                             {:returns => [0, 1]})
+            # raise for any error
+            raise cmd.stderr if !cmd.stderr.empty?
+            t = cmd.stdout.strip
             if t != ""
-              start_time_arr.push(Time.parse(t))
+              Time.parse(t)
             end
           end
           return start_time_arr.sort.first.to_s
@@ -209,8 +212,8 @@ module Locking_Resource
           return false
         elsif Time.parse(restart_failure_time).to_i < \
               Time.parse(start_time).to_i
-          Chef::Log.info ("#{process_identifier} seem to be started at "
-                          "#{start_time} after last restart failure at "
+          Chef::Log.info ("#{process_identifier} seem to be started at " \
+                          "#{start_time} after last restart failure at " \
                           "#{restart_failure_time}") 
           return true
         else
