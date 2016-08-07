@@ -175,7 +175,7 @@ module Locking_Resource
         cmd = shell_out!("pgrep -f \"#{process_identifier}\"",
                          {:returns => [0, 1]})
         # raise for any error
-        puts "XXX #{cmd.stderr}, XXX #{cmd.stdout}"
+        puts "XXXlib pgrep #{cmd.stderr}, XXX #{cmd.stdout}"
         raise cmd.stderr if !cmd.stderr.empty?
 
         if cmd.stdout.strip.empty?
@@ -186,6 +186,7 @@ module Locking_Resource
                              {:returns => [0, 1]})
             # raise for any error
             raise cmd.stderr if !cmd.stderr.empty?
+            puts "XXXlib ps #{cmd.stderr}, XXX #{cmd.stdout}"
             t = cmd.stdout.strip
             if t != ""
               Time.parse(t)
@@ -207,7 +208,9 @@ module Locking_Resource
                                          process_identifier)
       require 'time'
       begin
+        puts "XXX praf #{restart_failure_time}, #{process_identifier}"
         start_time = process_start_time(process_identifier)
+        puts "XXX praf #{start_time}"
         if start_time.nil?
           return false
         elsif Time.parse(restart_failure_time).to_i < \
