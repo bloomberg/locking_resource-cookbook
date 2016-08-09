@@ -14,21 +14,23 @@ describe Locking_Resource::Helper do
       let(:node_path) { '/my_test_path/a_node' }
       let(:hosts) { 'localtest_no_host_to_connect:2181' }
       let(:my_data) { 'my_data' }
-      let(:exception_str) { 'Error from test - should be puts()' }
+      let(:exception_str) { 'Error from test - should be logged' }
     
       it 'swallows exception and returns false' do
-        expect(STDOUT).to receive(:puts).with(exception_str)
+        expect(Log).to receive(:warn).with(exception_str)
         expect(Zookeeper).to receive(:new).and_raise(exception_str)
-        expect(dummy_class.create_node(quorum_hosts=hosts, path=node_path, data=my_data)).to match(false)
+        expect(dummy_class.create_node(quorum_hosts=hosts, path=node_path,
+          data=my_data)).to match(false)
       end
     
       it 'swallows exception and returns true' do
         dbl = double({ connected?: true,
                    create: {"rc".to_sym => 0}})
         expect(Zookeeper).to receive(:new) { dbl }
-        expect(STDOUT).to receive(:puts).with(exception_str)
+        expect(Log).to receive(:warn).with(exception_str)
         expect(dbl).to receive(:closed?).and_raise(exception_str)
-        expect(dummy_class.create_node(quorum_hosts=hosts, path=node_path, data=my_data)).to match(true)
+        expect(dummy_class.create_node(quorum_hosts=hosts, path=node_path,
+          data=my_data)).to match(true)
       end
     
       it 'returns true if node created' do
@@ -37,7 +39,8 @@ describe Locking_Resource::Helper do
                    create: {"rc".to_sym => 0},
                    closed?: true })
         end
-        expect(dummy_class.create_node(quorum_hosts=hosts, path=node_path, data=my_data)).to match(true)
+        expect(dummy_class.create_node(quorum_hosts=hosts, path=node_path,
+          data=my_data)).to match(true)
       end
     end
   end 
@@ -54,45 +57,212 @@ describe Locking_Resource::Helper do
       let(:node_path) { '/my_test_path/a_node' }
       let(:hosts) { 'localtest_no_host_to_connect:2181' }
       let(:my_data) { 'my_data' }
-      let(:exception_str) { 'Error from test - should be puts()' }
+      let(:exception_str) { 'Error from test - should be logged' }
       let(:dbl) { double() }
     
       it 'returns true if lock matches' do
         expect(Zookeeper).to receive(:new).with(hosts).exactly(1).times{ dbl }
         expect(dbl).to receive(:connected?).exactly(1).times{ true }
-        expect(dbl).to receive(:get).with(:path => node_path).exactly(1).times{ {:data => my_data} }
+        expect(dbl).to receive(:get).with(:path => node_path).exactly(1).\
+          times{ {:data => my_data} }
         expect(dbl).to receive(:closed?).exactly(1).times{ false }
         expect(dbl).to receive(:close).exactly(1).times
-        expect(dummy_class.lock_matches?(quorum_hosts=hosts, path=node_path, data=my_data)).to match(true)
+        expect(dummy_class.lock_matches?(quorum_hosts=hosts, path=node_path,
+          data=my_data)).to match(true)
       end
     
       it 'returns false if lock does not match' do
         expect(Zookeeper).to receive(:new).with(hosts).exactly(1).times{ dbl }
         expect(dbl).to receive(:connected?).exactly(1).times{ true }
-        expect(dbl).to receive(:get).with(:path => node_path).exactly(1).times{ {:data => 'random stuff'} }
+        expect(dbl).to receive(:get).with(:path => node_path).exactly(1).\
+          times{ {:data => 'random stuff'} }
         expect(dbl).to receive(:closed?).exactly(1).times{ false }
         expect(dbl).to receive(:close).exactly(1).times
-        expect(dummy_class.lock_matches?(quorum_hosts=hosts, path=node_path, data=my_data)).to match(false)
+        expect(dummy_class.lock_matches?(quorum_hosts=hosts, path=node_path,
+          data=my_data)).to match(false)
       end
     
       it 'swallows an exception in Zk.get and returns false' do
         expect(Zookeeper).to receive(:new).with(hosts).exactly(1).times{ dbl }
         expect(dbl).to receive(:connected?).exactly(1).times{ true }
-        expect(dbl).to receive(:get).with(:path => node_path).exactly(1).times.and_raise(exception_str)
-        expect(STDOUT).to receive(:puts).with(exception_str)
+        expect(dbl).to receive(:get).with(:path => node_path).exactly(1).times.\
+          and_raise(exception_str)
+        expect(Log).to receive(:warn).with(exception_str)
         expect(dbl).to receive(:closed?).exactly(1).times{ false }
         expect(dbl).to receive(:close).exactly(1).times
-        expect(dummy_class.lock_matches?(quorum_hosts=hosts, path=node_path, data=my_data)).to match(false)
+        expect(dummy_class.lock_matches?(quorum_hosts=hosts, path=node_path,
+          data=my_data)).to match(false)
       end
     
       it 'swallows an exception in Zk.close and returns true' do
         expect(Zookeeper).to receive(:new).with(hosts).exactly(1).times{ dbl }
         expect(dbl).to receive(:connected?).exactly(1).times{ true }
-        expect(dbl).to receive(:get).with(:path => node_path).exactly(1).times{ {:data => my_data} }
+        expect(dbl).to receive(:get).with(:path => node_path).exactly(1).\
+          times{ {:data => my_data} }
         expect(dbl).to receive(:closed?).exactly(1).times{ false }
         expect(dbl).to receive(:close).exactly(1).times.and_raise(exception_str)
-        expect(STDOUT).to receive(:puts).with(exception_str)
-        expect(dummy_class.lock_matches?(quorum_hosts=hosts, path=node_path, data=my_data)).to match(true)
+        expect(Log).to receive(:warn).with(exception_str)
+        expect(dummy_class.lock_matches?(quorum_hosts=hosts, path=node_path,
+          data=my_data)).to match(true)
+      end
+    end
+  end
+
+
+  describe '#release_lock' do
+    let(:dummy_class) do
+      Class.new do
+        include Locking_Resource::Helper
+      end.new
+    end
+
+    context 'called with reasonable parameters' do
+      require 'zookeeper' # ugly but easier than mocking the require
+      let(:node_path) { '/my_test_path/a_node' }
+      let(:hosts) { 'localtest_no_host_to_connect:2181' }
+      let(:my_data) { 'my_data' }
+      let(:exception_str) { 'Error from test - should be logged' }
+      let(:dbl) { double() }
+    
+      it 'returns true if lock matches' do
+        expect(Zookeeper).to receive(:new).with(hosts).exactly(1).times{ dbl }
+        expect(dbl).to receive(:connected?).exactly(1).times{ true }
+        expect(dummy_class).to receive(:lock_matches?).\
+          with(hosts, node_path, my_data).exactly(1).times{ true }
+        expect(dbl).to receive(:delete).exactly(1).times.\
+          with(:path => node_path){ {"rc".to_sym => 0} }
+        expect(dbl).to receive(:closed?).exactly(1).times{ false }
+        expect(dbl).to receive(:close).exactly(1).times
+        expect(dummy_class.release_lock(quorum_hosts=hosts, path=node_path,
+          data=my_data)).to match(true)
+      end
+
+      it 'returns false if lock does not match' do
+        expect(Zookeeper).to receive(:new).with(hosts).exactly(1).times{ dbl }
+        expect(dbl).to receive(:connected?).exactly(1).times{ true }
+        expect(dummy_class).to receive(:lock_matches?).\
+          with(hosts, node_path, my_data).exactly(1).times{ false }
+        expect(dbl).to receive(:closed?).exactly(1).times{ false }
+        expect(dbl).to receive(:close).exactly(1).times
+        expect(dummy_class.release_lock(quorum_hosts=hosts, path=node_path,
+          data=my_data)).to match(false)
+      end
+    end
+  end
+
+  describe '#get_node_data' do
+    let(:dummy_class) do
+      Class.new do
+        include Locking_Resource::Helper
+      end.new
+    end
+
+    context 'called with reasonable parameters' do
+      require 'zookeeper' # ugly but easier than mocking the require
+      let(:node_path) { '/my_test_path/a_node' }
+      let(:hosts) { 'localtest_no_host_to_connect:2181' }
+      let(:my_data) { 'my_data' }
+      let(:exception_str) do
+        "get_node_data: unable to connect to ZooKeeper quorum #{hosts}"
+      end
+      let(:dbl) { double() }
+    
+      it 'returns data if node exists' do
+        expect(Zookeeper).to receive(:new).with(hosts).exactly(1).times{ dbl }
+        expect(dbl).to receive(:connected?).exactly(1).times{ true }
+        expect(dbl).to receive(:get).with(:path => node_path).\
+          exactly(1).times{ {:rc => 0, :data => my_data} }
+        expect(dbl).to receive(:closed?).exactly(1).times{ false }
+        expect(dbl).to receive(:close).exactly(1).times
+        expect(dummy_class.get_node_data(quorum_hosts=hosts, path=node_path)).\
+          to match(my_data)
+      end
+
+      it 'returns nil if node can not be read' do
+        expect(Zookeeper).to receive(:new).with(hosts).exactly(1).times{ dbl }
+        expect(dbl).to receive(:connected?).exactly(1).times{ true }
+        expect(dbl).to receive(:get).with(:path => node_path).\
+          exactly(1).times{ {:rc => -101} }
+        expect(dbl).to receive(:closed?).exactly(1).times{ false }
+        expect(dbl).to receive(:close).exactly(1).times
+        expect(dummy_class.get_node_data(quorum_hosts=hosts, path=node_path)).\
+          to match(nil)
+      end
+    end
+  end
+
+  describe '#run_zk_block' do
+    let(:dummy_class) do
+      Class.new do
+        include Locking_Resource::Helper
+      end.new
+    end
+
+    context 'called with reasonable parameters' do
+      require 'zookeeper' # ugly but easier than mocking the require
+      let(:node_path) { '/my_test_path/a_node' }
+      let(:hosts) { 'localtest_no_host_to_connect:2181' }
+      let(:my_data) { 'my_data' }
+      let(:exception_str) do
+        "get_node_data: unable to connect to ZooKeeper quorum #{hosts}"
+      end
+      let(:dbl) { double() }
+    
+      it 'calls code in the block and returns value' do
+        expect(Zookeeper).to receive(:new).with(hosts).exactly(1).times{ dbl }
+        expect(dbl).to receive(:connected?).exactly(1).times{ true }
+        expect(dbl).to receive(:closed?).exactly(1).times{ true }
+        expect(
+          dummy_class.run_zk_block(quorum_hosts=hosts){ my_data }
+        ).to eq(my_data)
+      end
+
+      it 'calls code in the block and returns nil if nothing returned' do
+        expect(Zookeeper).to receive(:new).with(hosts).exactly(1).times{ dbl }
+        expect(dbl).to receive(:connected?).exactly(1).times{ true }
+        expect(dbl).to receive(:closed?).exactly(1).times{ true }
+        expect(
+          dummy_class.run_zk_block(quorum_hosts=hosts){ }
+        ).to eq(nil)
+      end
+
+      it 'raises if Zk.connect fails' do
+        expect(Zookeeper).to receive(:new).with(hosts).exactly(1).times{ dbl }
+        expect(dbl).to receive(:connected?).exactly(1).times{ false }
+        expect(dbl).to receive(:closed?).exactly(1).times{ false }
+        expect(dbl).to receive(:close).exactly(1).times
+        expect do
+          dummy_class.run_zk_block(quorum_hosts=hosts){ puts 'Fail if run' }
+        end.to raise_error(exception_str)
+      end
+
+      it 'swallows an exception in the block and Zk.close returning nil' do
+        expect(Zookeeper).to receive(:new).with(hosts).exactly(1).times{ dbl }
+        expect(dbl).to receive(:connected?).exactly(1).times{ true }
+        expect(Log).to receive(:warn).with(exception_str + ' Exception 1')
+        expect(dbl).to receive(:nil?).exactly(1).times.\
+          and_raise(exception_str + ' Exception 2')
+        expect(Log).to receive(:warn).with(exception_str + ' Exception 2')
+        expect(
+          dummy_class.run_zk_block(quorum_hosts=hosts) do
+            raise(exception_str + ' Exception 1')
+            'Final return fail should not be seen'
+          end
+        ).to eq(nil)
+      end
+
+      it 'swallows an exception in Zk.closed? and returns block result value' do
+        expect(Zookeeper).to receive(:new).with(hosts).exactly(1).times{ dbl }
+        expect(dbl).to receive(:connected?).exactly(1).times{ true }
+        expect(dummy_class).to receive(:lock_matches?).\
+          with(hosts, node_path, my_data).exactly(1).times{ true }
+        expect(dbl).to receive(:delete).exactly(1).times.\
+          with(:path => node_path){ {"rc".to_sym => 0} }
+        expect(dbl).to receive(:closed?).exactly(1).times.\
+          and_raise(exception_str)
+        expect(Log).to receive(:warn).with(exception_str)
+        expect(dummy_class.release_lock(quorum_hosts=hosts, path=node_path,
+          data=my_data)).to match(true)
       end
     end
   end
@@ -110,17 +280,17 @@ describe Locking_Resource::Helper do
       let(:command_string) { 'my command' }
     
       it 'returns true if ps says process started after time passed in' do
-        expect(dummy_class).to receive(:process_start_time).with('my command') do
-          late_ps_output
-        end
-        expect(dummy_class.process_restarted_after_failure?(early_ps_output, command_string)).to match(true)
+        expect(dummy_class).to receive(:process_start_time).\
+          with('my command') { late_ps_output }
+        expect(dummy_class.process_restarted_after_failure?(early_ps_output,
+          command_string)).to match(true)
       end
 
       it 'returns false if ps says process started before time passed in' do
-        expect(dummy_class).to receive(:process_start_time).with('my command') do
-          early_ps_output
-        end
-        expect(dummy_class.process_restarted_after_failure?(late_ps_output, command_string)).to match(false)
+        expect(dummy_class).to receive(:process_start_time).\
+          with('my command') { early_ps_output }
+        expect(dummy_class.process_restarted_after_failure?(late_ps_output,
+          command_string)).to match(false)
       end
     end
   end
@@ -145,7 +315,8 @@ describe Locking_Resource::Helper do
       def return_stdout(arg)
         puts "XXX early_idx #{early_idx}; PIDs: #{pids}"
         puts "XXX0 return_stdout Arg: #{arg}"
-        puts "XXX1 pgrep output: #{pgrep_output}" if arg == "pgrep -f \"#{command_string}\""
+        puts "XXX1 pgrep output: #{pgrep_output}" if \
+          arg == "pgrep -f \"#{command_string}\""
         # return a list of PIDs for pgrep(1)
         return pgrep_output if arg == "pgrep -f \"#{command_string}\""
         # We must return a known date somewhere so pick a PID to be that

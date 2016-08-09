@@ -2,6 +2,13 @@ require 'simplecov'
 require 'chefspec'
 require 'chefspec/berkshelf'
 
+if not defined?(Log)
+  require 'mixlib/log'
+  class Log
+    extend Mixlib::Log
+  end
+end
+
 formatters = [ SimpleCov::Formatter::HTMLFormatter ]
 
 begin

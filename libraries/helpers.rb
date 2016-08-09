@@ -1,8 +1,52 @@
 module Locking_Resource
   module Helper
+    class LockingResourceException < Exception
+    end
 
     include Chef::Mixin::ShellOut
    
+    #
+    # Run an arbitrary block of code against a Zookeeper connection
+    # Inputs:
+    #     quorum - 'localhost:2181' by default, comma separated
+    #                        e.g. ("zk_host1:port,sk_host2:port")
+    #     &block - the code to run
+    # Return value : return of the block
+    #                or exception if connection can not be estabilished
+    #
+    def run_zk_block(quorum_hosts='localhost:2181', &block)
+      require 'zookeeper'
+      val = nil
+      begin
+        zk = Zookeeper.new(quorum_hosts)
+        if !zk.connected?
+          raise LockingResourceException, \
+                  "Locking_Resource: unable to connect to ZooKeeper quorum " \
+                  "#{quorum_hosts}"
+        end
+        val = block.call(zk)
+      rescue Exception => e
+        puts "XXX Fix me to not swallow LockingResourceException"
+        Log.warn e.message
+      rescue LockingResourceException => e
+        raise
+      # make sure we always try to clean-up
+      ensure
+        begin
+          if !zk.nil?
+            zk.close unless zk.closed? 
+          end
+        rescue LockingResourceException => e
+          puts "XXX Do I get called if exception was from above?"
+          raise
+        rescue Exception => e
+          puts "XXX Fix me to not swallow LockingResourceException"
+          Log.warn e.message
+        end
+        return val
+      end
+    end
+
     #
     # Restarting of processes need to be controlled in a way that all
     # the nodes are not down at the sametime, the consequence of which will
@@ -33,7 +77,7 @@ module Locking_Resource
           lock_acquired = true
         end
       rescue Exception => e
-        puts e.message
+        Log.warn e.message
       # make sure we always try to clean-up
       ensure
         begin
@@ -41,7 +85,7 @@ module Locking_Resource
             zk.close unless zk.closed? 
           end
         rescue Exception => e
-          puts e.message
+          Log.warn e.message
         ensure
           return lock_acquired
         end
@@ -73,19 +117,18 @@ module Locking_Resource
           found_lock = true
         end
       rescue Exception => e
-        puts e.message
+        Log.warn e.message
       ensure
         begin
           if !zk.nil?
             zk.close unless zk.closed? 
           end
         rescue Exception => e
-          puts e.message
+          Log.warn e.message
         ensure
           return found_lock
         end
       end
-      return found_lock
     end
 
     #
@@ -97,49 +140,55 @@ module Locking_Resource
     # Return value : true or false based on whether the lock release was
     #                successful or not
     #
-    def rel_restart_lock(path, quorum_hosts='localhost:2181',node_name)
+    def release_lock(quorum_hosts='localhost:2181', path, data)
       require 'zookeeper'
       lock_released = false
       zk = nil
       begin
         zk = Zookeeper.new(quorum_hosts)
         if !zk.connected?
-          raise 'rel_restart_lock : unable to connect to ZooKeeper quorum ' \
+          raise 'release_lock: unable to connect to ZooKeeper quorum ' \
                 "#{quorum_hosts}"
         end
-        if my_restart_lock?(path, quorum_hosts, node_name)
+        if lock_matches?(quorum_hosts, path, data)
           ret = zk.delete(:path => path)
         else
-          raise 'rel_restart_lock : node who is not the owner is trying to '
+          raise 'release_lock: node who is not the owner is trying to '
                 'release the lock'
         end
         if ret[:rc] == 0
           lock_released = true
         end
       rescue Exception => e
-        puts e.message
+        Log.warn e.message
       ensure
-        if !zk.nil?
-          zk.close unless zk.closed? 
+        begin
+          if !zk.nil?
+            zk.close unless zk.closed? 
+          end
+        rescue Exception => e
+          Log.warn e.message
+        ensure
+          return lock_released
         end
       end
-      return lock_released
     end
 
     #
-    # Function to get the node name which is holding a particular service
-    # restart lock
-    # Input parameters: The path to the znode (lock) and the string of
-    #                   zookeeper hosts:port 
-    # Return value    : The fqdn of the node which created the znode to
-    #                   restart or nil
+    # Function to get the node data which is written to a particular path
+    # Input parameters: 
+    #     quorum - 'localhost:2181' by default, comma separated
+    #                        e.g. ("zk_host1:port,sk_host2:port")
+    #     path - the znode name to query
+    # Return value    : The data of the node or nil
     #
-    def get_restart_lock_holder(path, quorum_hosts='localhost:2181')
+    def get_node_data(quorum_hosts='localhost:2181', path)
       require 'zookeeper'
+      val = nil
       begin
         zk = Zookeeper.new(quorum_hosts)
         if !zk.connected?
-          raise 'get_restart_lock_holder : unable to connect to ZooKeeper ' \
+          raise 'get_node_data: unable to connect to ZooKeeper ' \
                 "quorum #{quorum_hosts}"
         end
         ret = zk.get(:path => path)
@@ -147,13 +196,18 @@ module Locking_Resource
           val = ret[:data]
         end
       rescue Exception => e
-        puts e.message
+        Log.warn e.message
       ensure
-        if !zk.nil?
-          zk.close unless zk.closed?
+        begin
+          if !zk.nil?
+            zk.close unless zk.closed? 
+          end
+        rescue Exception => e
+          Log.warn e.message
+        ensure
+          return val
         end
       end
-      return val
     end
 
     #
@@ -190,7 +244,7 @@ module Locking_Resource
         cmd = shell_out!("pgrep -f \"#{process_identifier}\"",
                          {:returns => [0, 1]})
         # raise for any error
-        puts "XXXlib pgrep #{cmd.stderr}, XXX #{cmd.stdout}"
+        Log.debug "XXXlib pgrep #{cmd.stderr}, XXX #{cmd.stdout}"
         raise cmd.stderr if !cmd.stderr.empty?
 
         if cmd.stdout.strip.empty?
@@ -201,7 +255,7 @@ module Locking_Resource
                              {:returns => [0, 1]})
             # raise for any error
             raise cmd.stderr if !cmd.stderr.empty?
-            puts "XXXlib ps #{cmd.stderr}, XXX #{cmd.stdout}"
+            Log.debug "XXXlib ps #{cmd.stderr}, XXX #{cmd.stdout}"
             t = cmd.stdout.strip
             if t != ''
               Time.parse(t)
@@ -223,9 +277,9 @@ module Locking_Resource
                                          process_identifier)
       require 'time'
       begin
-        puts "XXX praf #{restart_failure_time}, #{process_identifier}"
+        Log.debug "XXX praf #{restart_failure_time}, #{process_identifier}"
         start_time = process_start_time(process_identifier)
-        puts "XXX praf #{start_time}"
+        Log.debug "XXX praf #{start_time}"
         if start_time.nil?
           return false
         elsif Time.parse(restart_failure_time).to_i < \
