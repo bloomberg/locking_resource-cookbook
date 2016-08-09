@@ -2,6 +2,101 @@ require 'spec_helper'
 require 'pry'
 
 describe Locking_Resource::Helper do
+  describe '#create_node' do
+    let(:dummy_class) do
+      Class.new do
+        include Locking_Resource::Helper
+      end.new
+    end
+
+    context 'called with reasonable parameters' do
+      require 'zookeeper' # ugly but easier than mocking the require
+      let(:node_path) { '/my_test_path/a_node' }
+      let(:hosts) { 'localtest_no_host_to_connect:2181' }
+      let(:my_data) { 'my_data' }
+      let(:exception_str) { 'Error from test - should be puts()' }
+    
+      it 'swallows exception and returns false' do
+        expect(STDOUT).to receive(:puts).with(exception_str)
+        expect(Zookeeper).to receive(:new).and_raise(exception_str)
+        expect(dummy_class.create_node(quorum_hosts=hosts, path=node_path, data=my_data)).to match(false)
+      end
+    
+      it 'swallows exception and returns true' do
+        dbl = double({ connected?: true,
+                   create: {"rc".to_sym => 0}})
+        expect(Zookeeper).to receive(:new) { dbl }
+        expect(STDOUT).to receive(:puts).with(exception_str)
+        expect(dbl).to receive(:closed?).and_raise(exception_str)
+        expect(dummy_class.create_node(quorum_hosts=hosts, path=node_path, data=my_data)).to match(true)
+      end
+    
+      it 'returns true if node created' do
+        expect(Zookeeper).to receive(:new) do
+          double({ connected?: true,
+                   create: {"rc".to_sym => 0},
+                   closed?: true })
+        end
+        expect(dummy_class.create_node(quorum_hosts=hosts, path=node_path, data=my_data)).to match(true)
+      end
+    end
+  end 
+
+  describe '#lock_matches?' do
+    let(:dummy_class) do
+      Class.new do
+        include Locking_Resource::Helper
+      end.new
+    end
+
+    context 'called with reasonable parameters' do
+      require 'zookeeper' # ugly but easier than mocking the require
+      let(:node_path) { '/my_test_path/a_node' }
+      let(:hosts) { 'localtest_no_host_to_connect:2181' }
+      let(:my_data) { 'my_data' }
+      let(:exception_str) { 'Error from test - should be puts()' }
+      let(:dbl) { double() }
+    
+      it 'returns true if lock matches' do
+        expect(Zookeeper).to receive(:new).with(hosts).exactly(1).times{ dbl }
+        expect(dbl).to receive(:connected?).exactly(1).times{ true }
+        expect(dbl).to receive(:get).with(:path => node_path).exactly(1).times{ {:data => my_data} }
+        expect(dbl).to receive(:closed?).exactly(1).times{ false }
+        expect(dbl).to receive(:close).exactly(1).times
+        expect(dummy_class.lock_matches?(quorum_hosts=hosts, path=node_path, data=my_data)).to match(true)
+      end
+    
+      it 'returns false if lock does not match' do
+        expect(Zookeeper).to receive(:new).with(hosts).exactly(1).times{ dbl }
+        expect(dbl).to receive(:connected?).exactly(1).times{ true }
+        expect(dbl).to receive(:get).with(:path => node_path).exactly(1).times{ {:data => 'random stuff'} }
+        expect(dbl).to receive(:closed?).exactly(1).times{ false }
+        expect(dbl).to receive(:close).exactly(1).times
+        expect(dummy_class.lock_matches?(quorum_hosts=hosts, path=node_path, data=my_data)).to match(false)
+      end
+    
+      it 'swallows an exception in Zk.get and returns false' do
+        expect(Zookeeper).to receive(:new).with(hosts).exactly(1).times{ dbl }
+        expect(dbl).to receive(:connected?).exactly(1).times{ true }
+        expect(dbl).to receive(:get).with(:path => node_path).exactly(1).times.and_raise(exception_str)
+        expect(STDOUT).to receive(:puts).with(exception_str)
+        expect(dbl).to receive(:closed?).exactly(1).times{ false }
+        expect(dbl).to receive(:close).exactly(1).times
+        expect(dummy_class.lock_matches?(quorum_hosts=hosts, path=node_path, data=my_data)).to match(false)
+      end
+    
+      it 'swallows an exception in Zk.close and returns true' do
+        expect(Zookeeper).to receive(:new).with(hosts).exactly(1).times{ dbl }
+        expect(dbl).to receive(:connected?).exactly(1).times{ true }
+        expect(dbl).to receive(:get).with(:path => node_path).exactly(1).times{ {:data => my_data} }
+        expect(dbl).to receive(:closed?).exactly(1).times{ false }
+        expect(dbl).to receive(:close).exactly(1).times.and_raise(exception_str)
+        expect(STDOUT).to receive(:puts).with(exception_str)
+        expect(dummy_class.lock_matches?(quorum_hosts=hosts, path=node_path, data=my_data)).to match(true)
+      end
+    end
+  end
+
   describe '#process_restarted_after_failure?' do
     let(:dummy_class) do
       Class.new do
@@ -9,7 +104,7 @@ describe Locking_Resource::Helper do
       end.new
     end
 
-    context 'returns true if ps says process started after time passed in' do
+    context 'plausible ps output and command name' do
       let(:early_ps_output) { 'Tue Jul 12 14:38:34 2016' }
       let(:late_ps_output) { 'Sat Jul 30 18:48:45 2016' }
       let(:command_string) { 'my command' }
@@ -37,7 +132,7 @@ describe Locking_Resource::Helper do
       end
     end
 
-    context 'process exists' do
+    context 'random pids and early index with reasonable ps and command' do
       # create an arbitrary list of plausible PIDs one per line
       let(:pids) { (5..rand(10)).map { rand(1..2**15) } }
       let(:early_idx) { rand(0..pids.length-1) }
