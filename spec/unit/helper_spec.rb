@@ -121,7 +121,8 @@ describe Locking_Resource::Helper do
       let(:node_path) { '/my_test_path/a_node' }
       let(:hosts) { 'localtest_no_host_to_connect:2181' }
       let(:my_data) { 'my_data' }
-      let(:exception_str) { 'Error from test - should be logged' }
+      let(:exception_str) {
+        'Locking_Resource: release_lock: node does not contain expected data' }
       let(:dbl) { double() }
     
       it 'returns true if lock matches' do
@@ -144,8 +145,11 @@ describe Locking_Resource::Helper do
           with(hosts, node_path, my_data).exactly(1).times{ false }
         expect(dbl).to receive(:closed?).exactly(1).times{ false }
         expect(dbl).to receive(:close).exactly(1).times
-        expect(dummy_class.release_lock(quorum_hosts=hosts, path=node_path,
-          data=my_data)).to match(false)
+        expect do
+          dummy_class.release_lock(quorum_hosts=hosts,
+                                   path=node_path,
+                                   data=my_data)
+        end.to raise_error(exception_str)
       end
     end
   end
@@ -163,7 +167,7 @@ describe Locking_Resource::Helper do
       let(:hosts) { 'localtest_no_host_to_connect:2181' }
       let(:my_data) { 'my_data' }
       let(:exception_str) do
-        "get_node_data: unable to connect to ZooKeeper quorum #{hosts}"
+        "Locking_Resource: unable to connect to ZooKeeper quorum #{hosts}"
       end
       let(:dbl) { double() }
     
@@ -204,7 +208,7 @@ describe Locking_Resource::Helper do
       let(:hosts) { 'localtest_no_host_to_connect:2181' }
       let(:my_data) { 'my_data' }
       let(:exception_str) do
-        "get_node_data: unable to connect to ZooKeeper quorum #{hosts}"
+        "Locking_Resource: unable to connect to ZooKeeper quorum #{hosts}"
       end
       let(:dbl) { double() }
     

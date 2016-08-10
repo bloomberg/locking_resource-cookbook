@@ -26,10 +26,8 @@ module Locking_Resource
         end
         val = block.call(zk)
       rescue LockingResourceException => e
-        puts "XXX Hit our exception handler"
         raise
       rescue StandardError => e
-        puts "XXX Fix me to not swallow LockingResourceException"
         Log.warn e.message
       # make sure we always try to clean-up
       ensure
@@ -38,13 +36,11 @@ module Locking_Resource
             zk.close unless zk.closed? 
           end
         rescue LockingResourceException => e
-          puts "XXX Do I get called if exception was from above?"
           raise
         rescue StandardError => e
-          puts "XXX Fix me to not swallow LockingResourceException"
           Log.warn e.message
         end
-        return val
+        val
       end
     end
 
@@ -64,33 +60,12 @@ module Locking_Resource
     # Return value : true or false
     #
     def create_node(quorum_hosts='localhost:2181', path, data)
-      require 'zookeeper'
-      lock_acquired = false
-      zk = nil
-      begin
-        zk = Zookeeper.new(quorum_hosts)
-        if !zk.connected?
-          raise "create_node: unable to connect to ZooKeeper quorum "
-                "#{quorum_hosts}"
-        end
+      run_zk_block(quorum_hosts) do |zk|
         ret = zk.create(:path => path, :data => data)
         if ret[:rc] == 0
           lock_acquired = true
         end
-      rescue Exception => e
-        Log.warn e.message
-      # make sure we always try to clean-up
-      ensure
-        begin
-          if !zk.nil?
-            zk.close unless zk.closed? 
-          end
-        rescue Exception => e
-          Log.warn e.message
-        ensure
-          return lock_acquired
-        end
-      end
+      end ? true : false # ensure we catch returning nil and make it false
     end
 
     #
@@ -103,33 +78,13 @@ module Locking_Resource
     # Return value : true or false
     #
     def lock_matches?(quorum_hosts='localhost:2181', path, data)
-      require 'zookeeper'
-      found_lock = false
-      zk = nil
-      begin
-        zk = Zookeeper.new(quorum_hosts)
-        if !zk.connected?
-          raise "my_restart_lock?: unable to connect to ZooKeeper quorum " \
-                "#{quorum_hosts}"
-        end
+      run_zk_block(quorum_hosts) do |zk|
         ret = zk.get(:path => path)
         val = ret[:data]
         if val == data
           found_lock = true
         end
-      rescue Exception => e
-        Log.warn e.message
-      ensure
-        begin
-          if !zk.nil?
-            zk.close unless zk.closed? 
-          end
-        rescue Exception => e
-          Log.warn e.message
-        ensure
-          return found_lock
-        end
-      end
+      end ? true : false # ensure we catch returning nil and make it false
     end
 
     #
@@ -140,39 +95,22 @@ module Locking_Resource
     # node trying to release the lock.
     # Return value : true or false based on whether the lock release was
     #                successful or not
+    # Raises: If the node does not provide correct data
+    #         (and does not remove lock)
     #
     def release_lock(quorum_hosts='localhost:2181', path, data)
-      require 'zookeeper'
-      lock_released = false
-      zk = nil
-      begin
-        zk = Zookeeper.new(quorum_hosts)
-        if !zk.connected?
-          raise 'release_lock: unable to connect to ZooKeeper quorum ' \
-                "#{quorum_hosts}"
-        end
+      run_zk_block(quorum_hosts) do |zk|
         if lock_matches?(quorum_hosts, path, data)
           ret = zk.delete(:path => path)
         else
-          raise 'release_lock: node who is not the owner is trying to '
-                'release the lock'
+          raise LockingResourceException, \
+            'release_lock: node does not contain expected data '
+            'not releasing the lock'
         end
         if ret[:rc] == 0
           lock_released = true
         end
-      rescue Exception => e
-        Log.warn e.message
-      ensure
-        begin
-          if !zk.nil?
-            zk.close unless zk.closed? 
-          end
-        rescue Exception => e
-          Log.warn e.message
-        ensure
-          return lock_released
-        end
-      end
+      end ? true : false # ensure we catch returning nil and make it false
     end
 
     #
@@ -184,29 +122,10 @@ module Locking_Resource
     # Return value    : The data of the node or nil
     #
     def get_node_data(quorum_hosts='localhost:2181', path)
-      require 'zookeeper'
-      val = nil
-      begin
-        zk = Zookeeper.new(quorum_hosts)
-        if !zk.connected?
-          raise 'get_node_data: unable to connect to ZooKeeper ' \
-                "quorum #{quorum_hosts}"
-        end
+      run_zk_block(quorum_hosts) do |zk|
         ret = zk.get(:path => path)
         if ret[:rc] == 0
           val = ret[:data]
-        end
-      rescue Exception => e
-        Log.warn e.message
-      ensure
-        begin
-          if !zk.nil?
-            zk.close unless zk.closed? 
-          end
-        rescue Exception => e
-          Log.warn e.message
-        ensure
-          return val
         end
       end
     end
