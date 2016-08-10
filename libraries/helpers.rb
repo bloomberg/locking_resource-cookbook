@@ -25,11 +25,12 @@ module Locking_Resource
                   "#{quorum_hosts}"
         end
         val = block.call(zk)
-      rescue Exception => e
+      rescue LockingResourceException => e
+        puts "XXX Hit our exception handler"
+        raise
+      rescue StandardError => e
         puts "XXX Fix me to not swallow LockingResourceException"
         Log.warn e.message
-      rescue LockingResourceException => e
-        raise
       # make sure we always try to clean-up
       ensure
         begin
@@ -39,7 +40,7 @@ module Locking_Resource
         rescue LockingResourceException => e
           puts "XXX Do I get called if exception was from above?"
           raise
-        rescue Exception => e
+        rescue StandardError => e
           puts "XXX Fix me to not swallow LockingResourceException"
           Log.warn e.message
         end
