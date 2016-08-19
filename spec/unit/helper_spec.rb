@@ -122,7 +122,8 @@ describe Locking_Resource::Helper do
       let(:hosts) { 'localtest_no_host_to_connect:2181' }
       let(:my_data) { 'my_data' }
       let(:exception_str) {
-        'Locking_Resource: release_lock: node does not contain expected data' }
+        'release_lock: node does not contain expected data ' \
+        'not releasing the lock' }
       let(:dbl) { double() }
     
       it 'returns true if lock matches' do
