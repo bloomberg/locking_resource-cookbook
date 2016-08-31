@@ -1,0 +1,5 @@
+.rake_test_cache
+vendor/*
+.kitchen/*
+.*.sw*
+*~

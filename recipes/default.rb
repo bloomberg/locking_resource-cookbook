@@ -40,8 +40,8 @@ gem_package "zookeeper" do
 end.run_action(:install)
 
 execute "correct-gem-permissions" do
-  command "find #{Gem.default_dir()} -type f -exec chmod a+r {} \; && " +
-          "find #{Gem.default_dir()} -type d -exec chmod a+rx {} \;"
+  command "find #{Gem.default_dir()} -type f -exec chmod a+r {} \\; && " +
+          "find #{Gem.default_dir()} -type d -exec chmod a+rx {} \\;"
   user "root"
   action :nothing
 end.run_action(:run)
