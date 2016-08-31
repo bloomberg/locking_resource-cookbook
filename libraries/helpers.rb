@@ -104,7 +104,7 @@ module Locking_Resource
           ret = zk.delete(:path => path)
         else
           raise LockingResourceException, \
-            'release_lock: node does not contain expected data '
+            'release_lock: node does not contain expected data ' +
             'not releasing the lock'
         end
         if ret[:rc] == 0
