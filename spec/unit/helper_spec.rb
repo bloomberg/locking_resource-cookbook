@@ -16,7 +16,7 @@ describe Locking_Resource::Helper do
       let(:exception_str) { 'Error from test - should be logged' }
     
       it 'swallows exception and returns false' do
-        expect(Log).to receive(:warn).with(exception_str)
+        expect(Chef::Log).to receive(:warn).with(exception_str)
         expect(Zookeeper).to receive(:new).and_raise(exception_str)
         expect(dummy_class.create_node(quorum_hosts=hosts, path=node_path,
           data=my_data)).to match(false)
@@ -26,7 +26,7 @@ describe Locking_Resource::Helper do
         dbl = double({ connected?: true,
                    create: {"rc".to_sym => 0}})
         expect(Zookeeper).to receive(:new) { dbl }
-        expect(Log).to receive(:warn).with(exception_str)
+        expect(Chef::Log).to receive(:warn).with(exception_str)
         expect(dbl).to receive(:closed?).and_raise(exception_str)
         expect(dummy_class.create_node(quorum_hosts=hosts, path=node_path,
           data=my_data)).to match(true)
@@ -86,7 +86,7 @@ describe Locking_Resource::Helper do
         expect(dbl).to receive(:connected?).exactly(1).times{ true }
         expect(dbl).to receive(:get).with(:path => node_path).exactly(1).times.\
           and_raise(exception_str)
-        expect(Log).to receive(:warn).with(exception_str)
+        expect(Chef::Log).to receive(:warn).with(exception_str)
         expect(dbl).to receive(:closed?).exactly(1).times{ false }
         expect(dbl).to receive(:close).exactly(1).times
         expect(dummy_class.lock_matches?(quorum_hosts=hosts, path=node_path,
@@ -100,7 +100,7 @@ describe Locking_Resource::Helper do
           times{ {:data => my_data} }
         expect(dbl).to receive(:closed?).exactly(1).times{ false }
         expect(dbl).to receive(:close).exactly(1).times.and_raise(exception_str)
-        expect(Log).to receive(:warn).with(exception_str)
+        expect(Chef::Log).to receive(:warn).with(exception_str)
         expect(dummy_class.lock_matches?(quorum_hosts=hosts, path=node_path,
           data=my_data)).to match(true)
       end
@@ -243,10 +243,10 @@ describe Locking_Resource::Helper do
       it 'swallows an exception in the block and Zk.close returning nil' do
         expect(Zookeeper).to receive(:new).with(hosts).exactly(1).times{ dbl }
         expect(dbl).to receive(:connected?).exactly(1).times{ true }
-        expect(Log).to receive(:warn).with(exception_str + ' Exception 1')
+        expect(Chef::Log).to receive(:warn).with(exception_str + ' Exception 1')
         expect(dbl).to receive(:nil?).exactly(1).times.\
           and_raise(exception_str + ' Exception 2')
-        expect(Log).to receive(:warn).with(exception_str + ' Exception 2')
+        expect(Chef::Log).to receive(:warn).with(exception_str + ' Exception 2')
         expect(
           dummy_class.run_zk_block(quorum_hosts=hosts) do
             raise(exception_str + ' Exception 1')
@@ -264,7 +264,7 @@ describe Locking_Resource::Helper do
           with(:path => node_path){ {"rc".to_sym => 0} }
         expect(dbl).to receive(:closed?).exactly(1).times.\
           and_raise(exception_str)
-        expect(Log).to receive(:warn).with(exception_str)
+        expect(Chef::Log).to receive(:warn).with(exception_str)
         expect(dummy_class.release_lock(quorum_hosts=hosts, path=node_path,
           data=my_data)).to match(true)
       end

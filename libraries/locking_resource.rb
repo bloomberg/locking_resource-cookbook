@@ -21,6 +21,7 @@ class Chef
 
   class Provider::LockingResource < Provider
     include Poise
+    include ::LockingResource::Helper
     provides(:locking_resource)
 
     def action_serialize

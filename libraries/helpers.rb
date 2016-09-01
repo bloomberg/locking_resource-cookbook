@@ -28,7 +28,7 @@ module Locking_Resource
       rescue LockingResourceException => e
         raise
       rescue StandardError => e
-        Log.warn e.message
+        Chef::Log.warn e.message
       # make sure we always try to clean-up
       ensure
         begin
@@ -38,7 +38,7 @@ module Locking_Resource
         rescue LockingResourceException => e
           raise
         rescue StandardError => e
-          Log.warn e.message
+          Chef::Log.warn e.message
         end
         val
       end
@@ -164,7 +164,7 @@ module Locking_Resource
         cmd = shell_out!("pgrep -f \"#{process_identifier}\"",
                          {:returns => [0, 1]})
         # raise for any error
-        Log.debug "XXXlib pgrep #{cmd.stderr}, XXX #{cmd.stdout}"
+        Chef::Log.debug "XXXlib pgrep #{cmd.stderr}, XXX #{cmd.stdout}"
         raise cmd.stderr if !cmd.stderr.empty?
 
         if cmd.stdout.strip.empty?
@@ -175,7 +175,7 @@ module Locking_Resource
                              {:returns => [0, 1]})
             # raise for any error
             raise cmd.stderr if !cmd.stderr.empty?
-            Log.debug "XXXlib ps #{cmd.stderr}, XXX #{cmd.stdout}"
+            Chef::Log.debug "XXXlib ps #{cmd.stderr}, XXX #{cmd.stdout}"
             t = cmd.stdout.strip
             if t != ''
               Time.parse(t)
@@ -197,9 +197,9 @@ module Locking_Resource
                                          process_identifier)
       require 'time'
       begin
-        Log.debug "XXX praf #{restart_failure_time}, #{process_identifier}"
+        Chef::Log.debug "XXX praf #{restart_failure_time}, #{process_identifier}"
         start_time = process_start_time(process_identifier)
-        Log.debug "XXX praf #{start_time}"
+        Chef::Log.debug "XXX praf #{start_time}"
         if start_time.nil?
           return false
         elsif Time.parse(restart_failure_time).to_i < \
