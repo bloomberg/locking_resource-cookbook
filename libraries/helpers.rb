@@ -4,7 +4,12 @@ module Locking_Resource
     end
 
     include Chef::Mixin::ShellOut
-   
+
+    # XXX test and define me
+    def parse_zk_hosts(servers)
+      servers.join(',')
+    end
+
     #
     # Run an arbitrary block of code against a Zookeeper connection
     # Inputs:

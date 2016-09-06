@@ -11,6 +11,9 @@ platforms:
     attributes: {
     }
 suites:
-  - name: locking_resource
+  - name: simple_locking_resource
     run_list:
-      - 'recipe[locking_resource_test::default]'
+      - 'recipe[locking_resource_test::simple_serialized_lock]'
+  - name: simple_colliding_lock_resource
+    run_list:
+      - 'recipe[locking_resource_test::held_serialized_lock]'
