@@ -23,6 +23,7 @@ class Chef
 
   class Provider::LockingResource < Provider
     include Poise
+    require_relative 'helpers.rb'
     include ::Locking_Resource::Helper
     provides(:locking_resource)
 
@@ -35,7 +36,7 @@ class Chef
         # https://zookeeper.apache.org/doc/trunk/zookeeperProgrammers.html#ch_zkDataModel
         lock_path = ::File.join(node[:locking_resource][:restart_lock][:root],
                               new_resource.name.gsub(' ', ':'))
-        start_time = Time.now
+        lock_acquire_timeout = node[:locking_resource][:restart_lock_acquire][:timeout]
 
         Chef::Log.info "Acquiring lock #{lock_path}"
         # acquire lock
@@ -44,7 +45,8 @@ class Chef
         # intentionally do not use a timeout to avoid leaving a wonky zookeeper
         # object or connection if we interrupt it -- thus we trust the
         # zookeeper object to not wantonly hang
-        while !got_lock && start_time + timeout <= Time.now
+        start_time = Time.now
+        while !got_lock && (start_time + lock_acquire_timeout) >= Time.now
           got_lock = create_node(zk_hosts, lock_path, node[:fqdn]) and \
             Chef::Log.info "Acquired new lock"
         end

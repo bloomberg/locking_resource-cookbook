@@ -10,6 +10,8 @@ default[:locking_resource][:restart_lock_acquire][:max_tries] = 5
 default[:locking_resource][:restart_lock][:root] = '/lock'
 # Sleep time in seconds between tries to acquire the lock for restart
 default[:locking_resource][:restart_lock_acquire][:sleep_time] = 2
+# Timeout in seconds before failing to acquire lock
+default[:locking_resource][:restart_lock_acquire][:timeout] = 30
 # Flag to set whether the HDFS datanode restart process was successful or not
 default[:locking_resource][:hadoop_hdfs_datanode][:restart_failed] = false
 # Attribute to save the time when HDFS datanode restart process failed

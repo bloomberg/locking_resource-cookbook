@@ -68,7 +68,7 @@ module Locking_Resource
       run_zk_block(quorum_hosts) do |zk|
         ret = zk.create(:path => path, :data => data)
         if ret[:rc] == 0
-          lock_acquired = true
+          true
         end
       end ? true : false # ensure we catch returning nil and make it false
     end
