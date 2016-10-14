@@ -1,4 +1,4 @@
-module Locking_Resource
+module LockingResource
   module Helper
     class LockingResourceException < Exception
     end
@@ -19,28 +19,26 @@ module Locking_Resource
     # Return value : return of the block
     #                or exception if connection can not be estabilished
     #
-    def run_zk_block(quorum_hosts='localhost:2181', &block)
+    def run_zk_block(quorum_hosts = 'localhost:2181', &block)
       require 'zookeeper'
       val = nil
       begin
         zk = Zookeeper.new(quorum_hosts)
-        if !zk.connected?
-          raise LockingResourceException, \
-                  "Locking_Resource: unable to connect to ZooKeeper quorum " \
-                  "#{quorum_hosts}"
+        unless zk.connected?
+          fail LockingResourceException,
+            "LockingResource: unable to connect to ZooKeeper quorum " \
+            "#{quorum_hosts}"
         end
         val = block.call(zk)
-      rescue LockingResourceException => e
+      rescue LockingResourceException
         raise
       rescue StandardError => e
         Chef::Log.warn e.message
       # make sure we always try to clean-up
       ensure
         begin
-          if !zk.nil?
-            zk.close unless zk.closed? 
-          end
-        rescue LockingResourceException => e
+          zk.close unless (zk.nil? || zk.closed?)
+        rescue LockingResourceException
           raise
         rescue StandardError => e
           Chef::Log.warn e.message
@@ -64,13 +62,35 @@ module Locking_Resource
     #     data - the data to put in the znode
     # Return value : true or false
     #
-    def create_node(quorum_hosts='localhost:2181', path, data)
-      run_zk_block(quorum_hosts) do |zk|
-        ret = zk.create(:path => path, :data => data)
-        if ret[:rc] == 0
-          true
+    def create_node(quorum_hosts = 'localhost:2181', path, data)
+      # walk tree creating any necessary znodes:
+      unless get_node_data(quorum_hosts, path)
+        Chef::Log.debug "Did not find node: #{path}"
+
+        # affect a mkdir -p equivalent
+        pieces = path.split(File::SEPARATOR)
+        pieces = pieces.map.with_index do |p, i|
+          # create an ascending list of paths e.g.
+          # ["/foo", "/foo/bar", "/foo/bar/baz", etc.]
+          pieces.slice(0, i+1).join(File::SEPARATOR)
+        end.select{ |p| p.length > 0 && !get_node_data(quorum_hosts, p) }
+
+        # create parent nodes
+        pieces.slice(0, pieces.length-1).each do |p|
+          run_zk_block(quorum_hosts) do |zk|
+            ret = zk.create(path: p, data: '')
+            Chef::Log.debug "Tried to create node: #{p}; #{ret}"
+            fail LockingResourceException,
+              "Failed to create: #{p}" unless ret[:rc] == 0
+          end
         end
-      end ? true : false # ensure we catch returning nil and make it false
+      end # unless get_node_Data(quorum_hosts, parent_path)
+
+      run_zk_block(quorum_hosts) do |zk|
+        ret = zk.create(path: path, data: data)
+        Chef::Log.debug "Tried to create node: #{path}; #{ret}"
+        ret[:rc] == 0 ? true : false
+      end
     end
 
     #
@@ -84,12 +104,10 @@ module Locking_Resource
     #
     def lock_matches?(quorum_hosts='localhost:2181', path, data)
       run_zk_block(quorum_hosts) do |zk|
-        ret = zk.get(:path => path)
+        ret = zk.get(path: path)
         val = ret[:data]
-        if val == data
-          found_lock = true
-        end
-      end ? true : false # ensure we catch returning nil and make it false
+        true if val == data
+      end ? true : false
     end
 
     #
@@ -103,54 +121,31 @@ module Locking_Resource
     # Raises: If the node does not provide correct data
     #         (and does not remove lock)
     #
-    def release_lock(quorum_hosts='localhost:2181', path, data)
+    def release_lock(quorum_hosts = 'localhost:2181', path, data)
       run_zk_block(quorum_hosts) do |zk|
         if lock_matches?(quorum_hosts, path, data)
-          ret = zk.delete(:path => path)
+          ret = zk.delete(path: path)
         else
-          raise LockingResourceException, \
-            'release_lock: node does not contain expected data ' +
+          fail LockingResourceException,
+            'release_lock: node does not contain expected data ' \
             'not releasing the lock'
         end
-        if ret[:rc] == 0
-          lock_released = true
-        end
+        true if ret[:rc] == 0
       end ? true : false # ensure we catch returning nil and make it false
     end
 
     #
     # Function to get the node data which is written to a particular path
-    # Input parameters: 
+    # Input parameters:
     #     quorum - 'localhost:2181' by default, comma separated
     #                        e.g. ("zk_host1:port,sk_host2:port")
     #     path - the znode name to query
     # Return value    : The data of the node or nil
     #
-    def get_node_data(quorum_hosts='localhost:2181', path)
+    def get_node_data(quorum_hosts = 'localhost:2181', path)
       run_zk_block(quorum_hosts) do |zk|
-        ret = zk.get(:path => path)
-        if ret[:rc] == 0
-          val = ret[:data]
-        end
-      end
-    end
-
-    #
-    # Function to generate the full path of znode which will be used to create
-    # a restart lock znode
-    # Input paramaters: The path in ZK where znodes are created for the restart
-    #                   locks and the lock name
-    # Return value    : Fully formed path which can be used to create the znode 
-    #
-    def format_restart_lock_path(root, lock_name)
-      begin
-        if root.nil?
-          return "/#{lock_name}"
-        elsif root == '/'
-          return "/#{lock_name}"
-        else
-          return "#{root}/#{lock_name}"
-        end
+        ret = zk.get(path: path)
+        ret[:data] if ret[:rc] == 0
       end
     end
 
@@ -166,25 +161,22 @@ module Locking_Resource
     def process_start_time(process_identifier)
       require 'time'
       begin
-        cmd = shell_out!("pgrep -f \"#{process_identifier}\"",
-                         {:returns => [0, 1]})
+        cmd = shell_out!("pgrep -f \"#{process_identifier}\"", returns: [0, 1])
         # raise for any error
         Chef::Log.debug "XXXlib pgrep #{cmd.stderr}, XXX #{cmd.stdout}"
-        raise cmd.stderr if !cmd.stderr.empty?
+        fail cmd.stderr unless cmd.stderr.empty?
 
         if cmd.stdout.strip.empty?
           return nil
         else
           start_time_arr = cmd.stdout.strip.split("\n").map do |pid|
             cmd = shell_out!("ps --no-header -o lstart #{pid}",
-                             {:returns => [0, 1]})
+                             returns: [0, 1])
             # raise for any error
-            raise cmd.stderr if !cmd.stderr.empty?
+            fail cmd.stderr unless cmd.stderr.empty?
             Chef::Log.debug "XXXlib ps #{cmd.stderr}, XXX #{cmd.stdout}"
             t = cmd.stdout.strip
-            if t != ''
-              Time.parse(t)
-            end
+            Time.parse(t) if t != ''
           end
           return start_time_arr.sort.first.to_s
         end
@@ -209,9 +201,9 @@ module Locking_Resource
           return false
         elsif Time.parse(restart_failure_time).to_i < \
               Time.parse(start_time).to_i
-          Chef::Log.info ("#{process_identifier} seem to be started at " \
-                          "#{start_time} after last restart failure at " \
-                          "#{restart_failure_time}") 
+          Chef::Log.info "#{process_identifier} seem to be started at " \
+                         "#{start_time} after last restart failure at " \
+                         "#{restart_failure_time}"
           return true
         else
           return false

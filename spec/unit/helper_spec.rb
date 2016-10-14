@@ -1,10 +1,10 @@
 require 'spec_helper'
 
-describe Locking_Resource::Helper do
+describe LockingResource::Helper do
   describe '#create_node' do
     let(:dummy_class) do
       Class.new do
-        include Locking_Resource::Helper
+        include LockingResource::Helper
       end.new
     end
 
@@ -47,7 +47,7 @@ describe Locking_Resource::Helper do
   describe '#lock_matches?' do
     let(:dummy_class) do
       Class.new do
-        include Locking_Resource::Helper
+        include LockingResource::Helper
       end.new
     end
 
@@ -111,7 +111,7 @@ describe Locking_Resource::Helper do
   describe '#release_lock' do
     let(:dummy_class) do
       Class.new do
-        include Locking_Resource::Helper
+        include LockingResource::Helper
       end.new
     end
 
@@ -157,7 +157,7 @@ describe Locking_Resource::Helper do
   describe '#get_node_data' do
     let(:dummy_class) do
       Class.new do
-        include Locking_Resource::Helper
+        include LockingResource::Helper
       end.new
     end
 
@@ -167,7 +167,7 @@ describe Locking_Resource::Helper do
       let(:hosts) { 'localtest_no_host_to_connect:2181' }
       let(:my_data) { 'my_data' }
       let(:exception_str) do
-        "Locking_Resource: unable to connect to ZooKeeper quorum #{hosts}"
+        "LockingResource: unable to connect to ZooKeeper quorum #{hosts}"
       end
       let(:dbl) { double() }
     
@@ -198,7 +198,7 @@ describe Locking_Resource::Helper do
   describe '#run_zk_block' do
     let(:dummy_class) do
       Class.new do
-        include Locking_Resource::Helper
+        include LockingResource::Helper
       end.new
     end
 
@@ -208,7 +208,7 @@ describe Locking_Resource::Helper do
       let(:hosts) { 'localtest_no_host_to_connect:2181' }
       let(:my_data) { 'my_data' }
       let(:exception_str) do
-        "Locking_Resource: unable to connect to ZooKeeper quorum #{hosts}"
+        "LockingResource: unable to connect to ZooKeeper quorum #{hosts}"
       end
       let(:dbl) { double() }
     
@@ -274,7 +274,7 @@ describe Locking_Resource::Helper do
   describe '#process_restarted_after_failure?' do
     let(:dummy_class) do
       Class.new do
-        include Locking_Resource::Helper
+        include LockingResource::Helper
       end.new
     end
 
@@ -302,7 +302,7 @@ describe Locking_Resource::Helper do
   describe '#process_start_time?' do
     let(:dummy_class) do
       Class.new do
-        include Locking_Resource::Helper
+        include LockingResource::Helper
       end
     end
 
@@ -352,7 +352,7 @@ describe Locking_Resource::Helper do
 # Can not seem to get standard out stub to work
 # Randomized with seed 15068
 #
-#Locking_Resource::Helper
+#LockingResource::Helper
 #  #process_start_time?
 #    process exists
 #XXX early_idx 0; PIDs: [29371, 6114]
@@ -380,7 +380,7 @@ describe Locking_Resource::Helper do
 #
 #Failures:
 #
-#  1) Locking_Resource::Helper#process_start_time? process exists raises under ps error
+#  1) LockingResource::Helper#process_start_time? process exists raises under ps error
 #     Failure/Error:
 #       expect { dummy_class.new.process_start_time(command_string) }.to \
 #         raise_error(error_string)

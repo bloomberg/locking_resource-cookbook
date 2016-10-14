@@ -5,7 +5,7 @@ describe 'locking_resource::default' do
     ChefSpec::SoloRunner.new(platform: 'ubuntu', version: '12.04')
   end
 
-  it "should install necessary packages" do
+  it 'should serialize locking resource' do
     chef_run.converge(described_recipe)
     %w{make patch gcc}.each do|pkg|
       expect(chef_run).to install_package(pkg)
