@@ -46,13 +46,11 @@ class Chef
         # object or connection if we interrupt it -- thus we trust the
         # zookeeper object to not wantonly hang
         start_time = Time.now
-        puts "XXX Start: #{Time.now}"
         while !got_lock && (start_time + lock_acquire_timeout) >= Time.now
           got_lock = create_node(zk_hosts, lock_path, node[:fqdn]) and \
             Chef::Log.info "Acquired new lock"
           sleep(0.25)
         end
-        puts "XXX End: #{Time.now}"
 
         # affect the resource, if we got the lock -- or error
         if got_lock
