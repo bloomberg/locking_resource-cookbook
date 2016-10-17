@@ -1,5 +1,5 @@
 #
-# Cookbook Name:: linked_resource
+# Cookbook Name:: locking_resource
 # Recipe:: default
 #
 # Copyright 2016, Bloomberg Finance L.P.
@@ -39,6 +39,7 @@ gem_package "zookeeper" do
     action :nothing
 end.run_action(:install)
 
+# work around funky umasks
 execute "correct-gem-permissions" do
   command "find #{Gem.default_dir()} -type f -exec chmod a+r {} \\; && " +
           "find #{Gem.default_dir()} -type d -exec chmod a+rx {} \\;"

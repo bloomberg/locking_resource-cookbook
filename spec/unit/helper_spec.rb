@@ -16,28 +16,65 @@ describe LockingResource::Helper do
       let(:exception_str) { 'Error from test - should be logged' }
     
       it 'swallows exception and returns false' do
-        expect(Chef::Log).to receive(:warn).with(exception_str)
+        # first let path detection run 
+        expect(dummy_class).to receive(:get_node_data). \
+          with(quorum_hosts=hosts, path=node_path) { "" }
+        # fail second zookeeper creation
         expect(Zookeeper).to receive(:new).and_raise(exception_str)
+        expect(Chef::Log).to receive(:warn).with(exception_str)
         expect(dummy_class.create_node(quorum_hosts=hosts, path=node_path,
           data=my_data)).to match(false)
       end
     
-      it 'swallows exception and returns true' do
+      it 'creates necessary path and returns true' do
+        expect(dummy_class).to receive(:get_node_data). \
+          with(quorum_hosts=hosts, path=node_path) { false }
+        expect(dummy_class).to receive(:get_node_data). \
+          with(quorum_hosts=hosts, path=::File.dirname(node_path)) { false }
+        expect(dummy_class).to receive(:get_node_data). \
+          with(quorum_hosts=hosts, path=node_path) { false }
         dbl = double({ connected?: true,
-                   create: {"rc".to_sym => 0}})
+                       closed?: true })
         expect(Zookeeper).to receive(:new) { dbl }
+        expect(dbl).to receive(:create).with({:path => ::File.dirname(node_path), :data => ''}).exactly(1).times{ {:rc => 0} }
+        expect(Zookeeper).to receive(:new) { dbl }
+        expect(dbl).to receive(:create).with({:path => node_path, :data => my_data}).exactly(1).times{{:rc => 0}}
+        expect(dummy_class.create_node(quorum_hosts=hosts, path=node_path,
+          data=my_data)).to match(true)
+      end
+
+      it 'swallows exception and returns true' do
+        # create_node tests for mkdir -p equiv
+        expect(dummy_class).to receive(:get_node_data). \
+          with(quorum_hosts=hosts, path=node_path) { false }
+        expect(dummy_class).to receive(:get_node_data). \
+          with(quorum_hosts=hosts, path=::File.dirname(node_path)) { false }
+        expect(dummy_class).to receive(:get_node_data). \
+          with(quorum_hosts=hosts, path=node_path) { false }
+        # create nodes for mkdir -p equiv
+        dbl = double({ connected?: true,
+                       create: {"rc".to_sym => 0},
+                       closed?: true })
+        expect(Zookeeper).to receive(:new) { dbl }
+        # actual test
+        dbl = double({ connected?: true,
+                       create: {"rc".to_sym => 0}})
+        expect(Zookeeper).to receive(:new) { dbl }
+        expect(dbl).to receive(:closed?).and_raise(exception_str)
         expect(Chef::Log).to receive(:warn).with(exception_str)
         expect(dbl).to receive(:closed?).and_raise(exception_str)
+        expect(Chef::Log).to receive(:warn).with(exception_str)
         expect(dummy_class.create_node(quorum_hosts=hosts, path=node_path,
           data=my_data)).to match(true)
       end
     
       it 'returns true if node created' do
-        expect(Zookeeper).to receive(:new) do
-          double({ connected?: true,
+        expect(dummy_class).to receive(:get_node_data). \
+          with(quorum_hosts=hosts, path=node_path) { true }
+        dbl = double({ connected?: true,
                    create: {"rc".to_sym => 0},
                    closed?: true })
-        end
+        expect(Zookeeper).to receive(:new) { dbl }
         expect(dummy_class.create_node(quorum_hosts=hosts, path=node_path,
           data=my_data)).to match(true)
       end

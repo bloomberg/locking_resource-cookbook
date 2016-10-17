@@ -17,7 +17,7 @@ module LockingResource
     #                        e.g. ("zk_host1:port,sk_host2:port")
     #     &block - the code to run
     # Return value : return of the block
-    #                or exception if connection can not be estabilished
+    #                or nil if connection can not be estabilished
     #
     def run_zk_block(quorum_hosts = 'localhost:2181', &block)
       require 'zookeeper'
@@ -76,8 +76,8 @@ module LockingResource
         end.select{ |p| p.length > 0 && !get_node_data(quorum_hosts, p) }
 
         # create parent nodes
-        pieces.slice(0, pieces.length-1).each do |p|
-          run_zk_block(quorum_hosts) do |zk|
+        run_zk_block(quorum_hosts) do |zk|
+          pieces.slice(0, pieces.length-1).each do |p|
             ret = zk.create(path: p, data: '')
             Chef::Log.debug "Tried to create node: #{p}; #{ret}"
             fail LockingResourceException,
@@ -89,8 +89,8 @@ module LockingResource
       run_zk_block(quorum_hosts) do |zk|
         ret = zk.create(path: path, data: data)
         Chef::Log.debug "Tried to create node: #{path}; #{ret}"
-        ret[:rc] == 0 ? true : false
-      end
+        ret[:rc] == 0
+      end ? true : false
     end
 
     #
