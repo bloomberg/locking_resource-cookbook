@@ -45,22 +45,10 @@ RSpec.configure do |config|
     mocks.verify_partial_doubles = true
   end
 
+  berks = Berkshelf::Berksfile.from_file('Berksfile').install()
 end
 
-berks = Berkshelf::Berksfile.from_file('Berksfile').install()
 
-at_exit { ChefSpec::Coverage.report! }
-
-RSpec.shared_context 'recipe tests', type: :recipe do
-
-  let(:chef_run) {
-    ChefSpec::SoloRunner.new(node_attributes).converge(described_recipe)
-  }
-
-  def node_attributes
-    {
-      platform: 'ubuntu',
-      version: '14.04',
-    }
-  end
+at_exit do
+ ChefSpec::Coverage.report!
 end

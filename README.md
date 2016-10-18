@@ -9,6 +9,12 @@ The Zookeeper gem and a Zookeeper cluster is required as Zookeeper is used for a
 Attributes
 ==========
 
+
 Usage
 =====
 
+Contributing
+============
+$ bundler
+$ berks vendor
+$ bundler exec rspec

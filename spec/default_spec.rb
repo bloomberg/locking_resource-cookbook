@@ -2,7 +2,8 @@ require 'chefspec'
 
 describe 'locking_resource::default' do
   let :chef_run do
-    ChefSpec::SoloRunner.new(platform: 'ubuntu', version: '12.04')
+    ChefSpec::SoloRunner.new(platform: 'ubuntu', version: '14.04',
+                             cookbook_path: File.join(File.expand_path(Dir.pwd), 'berks-cookbooks'))
   end
 
   it 'should serialize locking resource' do
