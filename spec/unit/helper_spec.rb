@@ -1,4 +1,5 @@
 require 'spec_helper'
+require 'time'
 
 describe LockingResource::Helper do
   describe '#create_node' do
@@ -191,6 +192,46 @@ describe LockingResource::Helper do
     end
   end
 
+  describe '#get_node_ctime' do
+    let(:dummy_class) do
+      Class.new do
+        include LockingResource::Helper
+      end.new
+    end
+
+    context 'called with reasonable parameters' do
+      require 'zookeeper' # ugly but easier than mocking the require
+      let(:node_path) { '/my_test_path' }
+      let(:hosts) { 'localtest_no_host_to_connect:2181' }
+      let(:stat) { double({exists:         true,
+                           ctime:          1476401413663,
+                           mtime:          1476401413663}) }
+      let(:dbl) { double() }
+ 
+      it 'returns data if node exists' do
+        expect(Zookeeper).to receive(:new).with(hosts).exactly(1).times{ dbl }
+        expect(dbl).to receive(:connected?).exactly(1).times{ true }
+        expect(dbl).to receive(:stat).with(:path => node_path).\
+          exactly(1).times{ {:rc => 0, :stat => stat} }
+        expect(dbl).to receive(:closed?).exactly(1).times{ false }
+        expect(dbl).to receive(:close).exactly(1).times
+        expect(dummy_class.get_node_ctime(quorum_hosts=hosts, path=node_path)).\
+          to match(Time.strptime('1476401413663', '%Q'))
+      end
+
+      it 'returns nil if node can not be read' do
+        expect(Zookeeper).to receive(:new).with(hosts).exactly(1).times{ dbl }
+        expect(dbl).to receive(:connected?).exactly(1).times{ true }
+        expect(dbl).to receive(:stat).with(:path => node_path).\
+          exactly(1).times{ {:rc => -101} }
+        expect(dbl).to receive(:closed?).exactly(1).times{ false }
+        expect(dbl).to receive(:close).exactly(1).times
+        expect(dummy_class.get_node_ctime(quorum_hosts=hosts, path=node_path)).\
+          to match(nil)
+      end
+    end
+  end
+
   describe '#get_node_data' do
     let(:dummy_class) do
       Class.new do
@@ -207,7 +248,7 @@ describe LockingResource::Helper do
         "LockingResource: unable to connect to ZooKeeper quorum #{hosts}"
       end
       let(:dbl) { double() }
-    
+
       it 'returns data if node exists' do
         expect(Zookeeper).to receive(:new).with(hosts).exactly(1).times{ dbl }
         expect(dbl).to receive(:connected?).exactly(1).times{ true }
@@ -308,34 +349,6 @@ describe LockingResource::Helper do
     end
   end
 
-  describe '#process_restarted_after_failure?' do
-    let(:dummy_class) do
-      Class.new do
-        include LockingResource::Helper
-      end.new
-    end
-
-    context 'plausible ps output and command name' do
-      let(:early_ps_output) { 'Tue Jul 12 14:38:34 2016' }
-      let(:late_ps_output) { 'Sat Jul 30 18:48:45 2016' }
-      let(:command_string) { 'my command' }
-    
-      it 'returns true if ps says process started after time passed in' do
-        expect(dummy_class).to receive(:process_start_time).\
-          with('my command') { late_ps_output }
-        expect(dummy_class.process_restarted_after_failure?(early_ps_output,
-          command_string)).to match(true)
-      end
-
-      it 'returns false if ps says process started before time passed in' do
-        expect(dummy_class).to receive(:process_start_time).\
-          with('my command') { early_ps_output }
-        expect(dummy_class.process_restarted_after_failure?(late_ps_output,
-          command_string)).to match(false)
-      end
-    end
-  end
-
   describe '#process_start_time?' do
     let(:dummy_class) do
       Class.new do
@@ -343,36 +356,22 @@ describe LockingResource::Helper do
       end
     end
 
-    context 'random pids and early index with reasonable ps and command' do
+    context 'pgrep pid and reasonable ps and command' do
       # create an arbitrary list of plausible PIDs one per line
-      let(:pids) { (5..rand(10)).map { rand(1..2**15) } }
-      let(:early_idx) { rand(0..pids.length-1) }
-      let(:early_ps_output) { 'Tue Jul 12 14:38:34 2016' }
-      let(:late_ps_output) { 'Sat Jul 30 18:48:45 2016' }
-      let(:pgrep_output) { pids.join("\n") + "\n" }
-      let(:command_string) { 'my command' }
+      let(:ps_output) { 'Tue Jul 12 14:38:34 2016' }
+      let(:pgrep_output) { rand(1..2**15).to_s + "\n" }
+      let(:test_command) { 'my command' }
       let(:error_string) { 'TEST: We got an error' }
 
       def return_stdout(arg)
-        puts "XXX early_idx #{early_idx}; PIDs: #{pids}"
-        puts "XXX0 return_stdout Arg: #{arg}"
-        puts "XXX1 pgrep output: #{pgrep_output}" if \
-          arg == "pgrep -f \"#{command_string}\""
-        # return a list of PIDs for pgrep(1)
-        return pgrep_output if arg == "pgrep -f \"#{command_string}\""
-        # We must return a known date somewhere so pick a PID to be that
-        # and return that early date
-        puts "XXX1 Returning early" if arg.start_with?('ps') && \
-                                  arg.end_with?(pids[early_idx].to_s)
-        return "#{early_ps_output}\n" if arg.start_with?('ps') && \
-                                         arg.end_with?(pids[early_idx].to_s)
-        # return our late date for all other PIDs
-        puts "XXX1 Returning late"
-        return "#{late_ps_output}\n"
+        # return a PID for pgrep(1)
+        return pgrep_output if arg.strip() == %Q{pgrep -o -f "#{test_command}"}
+        # We must return a known date
+        return "#{ps_output}\n" if arg.start_with?('ps')
+        raise "Unexpected arg: |#{arg}|"
       end
  
       it 'raises under pgrep error' do
-        puts "XXX early_idx #{early_idx}; PIDs: #{pids}"
         expect(Mixlib::ShellOut).to receive(:new) do |arg|
           double({ run_command: nil,
             error!: '',
@@ -382,7 +381,8 @@ describe LockingResource::Helper do
             live_stream: ''
           })
         end.exactly(1).times
-        expect { dummy_class.new.process_start_time(command_string) }.to \
+        expect { dummy_class.new.process_start_time(full_cmd: true,
+          command_string: test_command) }.to \
           raise_error(error_string)
       end
 
@@ -461,9 +461,7 @@ describe LockingResource::Helper do
 #     end
 
       it 'returns the earliest time' do
-        puts "XXX early_idx #{early_idx}; PIDs: #{pids}"
         expect(Mixlib::ShellOut).to receive(:new) do |arg|
-          puts "XXX3 Happy run - earliest time!"
           double({ run_command: nil,
             error!: '',
             exitstatus: 0,
@@ -471,9 +469,10 @@ describe LockingResource::Helper do
             stderr: '',
             live_stream: ''
           })
-        end.exactly(pids.length+1).times
-        expect(dummy_class.new.process_start_time(command_string)).to \
-          eq(Time.parse(early_ps_output).to_s)
+        end.exactly(2).times
+        expect(dummy_class.new.process_start_time(full_cmd: true,
+          command_string: test_command).to_i).to \
+          eq(Time.parse(ps_output).to_i)
       end
     end
   end

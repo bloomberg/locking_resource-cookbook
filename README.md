@@ -15,6 +15,8 @@ Usage
 
 Contributing
 ============
-$ bundler
+````
+$ bundler --path=vendor/cache
 $ berks vendor
 $ bundler exec rspec
+````

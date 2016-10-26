@@ -150,64 +150,60 @@ module LockingResource
     end
 
     #
-    # Function to identify start time of a process
-    # Input: process_identifier - 'pgrep -f' compatible process search string
-    # Returns: A Ruby Time object representing the processes start time or nil
-    # Note:
-    # * If multiple instances are returned from pgrep(1), the time returned
-    #   will be the earliest time of all the instances
-    # * If the process can not be found, nil is returned
+    # Function to get the lock creation time
+    # Input parameters:
+    #     quorum - 'localhost:2181' by default, comma separated
+    #                        e.g. ("zk_host1:port,sk_host2:port")
+    #     path - the znode name to query
+    # Return value    : A Ruby time object of the node's creation or nil
     #
-    def process_start_time(process_identifier)
+    def get_node_ctime(quorum_hosts = 'localhost:2181', path)
       require 'time'
-      begin
-        cmd = shell_out!("pgrep -f \"#{process_identifier}\"", returns: [0, 1])
-        # raise for any error
-        Chef::Log.debug "XXXlib pgrep #{cmd.stderr}, XXX #{cmd.stdout}"
-        fail cmd.stderr unless cmd.stderr.empty?
-
-        if cmd.stdout.strip.empty?
-          return nil
-        else
-          start_time_arr = cmd.stdout.strip.split("\n").map do |pid|
-            cmd = shell_out!("ps --no-header -o lstart #{pid}",
-                             returns: [0, 1])
-            # raise for any error
-            fail cmd.stderr unless cmd.stderr.empty?
-            Chef::Log.debug "XXXlib ps #{cmd.stderr}, XXX #{cmd.stdout}"
-            t = cmd.stdout.strip
-            Time.parse(t) if t != ''
-          end
-          return start_time_arr.sort.first.to_s
-        end
+      run_zk_block(quorum_hosts) do |zk|
+        ret = zk.stat(path: path)
+        Time.strptime(ret[:stat].ctime.to_s, '%Q') if ret[:rc] == 0
       end
     end
 
     #
-    # Function to check whether a process was started manually after restart of
-    # the process failed during prev chef client run
-    # Input: restart_failure_time - Last restart failure time
-    #        process_identifier - string to identify the process
-    # Returns: true (the process restarted since failing) or false (it did not)
+    # Function to identify start time of a process
+    # Input: command_string - 'pgrep ' compatible process search string
+    #        full_cmd - boolean whether to use use 'pgrep -f' for command string
+    #        user - use 'pgrep -u <user>' for search string
     #
-    def process_restarted_after_failure?(restart_failure_time,
-                                         process_identifier)
+    # Returns: A Ruby Time object representing the eldest process's start time or nil
+    # Note:
+    # * If the process can not be found, nil is returned
+    #
+    # ensure VALID_PROCESS_PATTERN_OPTS matches the arguments
+    # available process_start_time()
+    VALID_PROCESS_PATTERN_OPTS = {full_cmd: false, command_string: nil, user: nil}
+    def process_start_time(full_cmd: false, command_string: nil, user: nil)
       require 'time'
-      begin
-        Chef::Log.debug "XXX praf #{restart_failure_time}, #{process_identifier}"
-        start_time = process_start_time(process_identifier)
-        Chef::Log.debug "XXX praf #{start_time}"
-        if start_time.nil?
-          return false
-        elsif Time.parse(restart_failure_time).to_i < \
-              Time.parse(start_time).to_i
-          Chef::Log.info "#{process_identifier} seem to be started at " \
-                         "#{start_time} after last restart failure at " \
-                         "#{restart_failure_time}"
-          return true
-        else
-          return false
-        end
+      
+      raise "Need a command_string or user to search for:" if \
+        (command_string.nil? and user.nil?)
+      # pgrep options mapped to command arguments
+      cmd_opts = [(user and %Q{-u "#{user}"}),
+                  (full_cmd and "-f"),
+                  (command_string and %Q{"#{command_string}"})].\
+        select{|m| m}.join(' ')
+      cmd = shell_out!("pgrep -o #{cmd_opts}", returns: [0, 1])
+      # raise for any error
+      Chef::Log.warn "XXXlib pgrep -o #{cmd_opts}; #{cmd.stderr}, XXX #{cmd.stdout}"
+      fail cmd.stderr unless cmd.stderr.empty?
+
+      if cmd.stdout.strip.empty?
+        nil
+      else
+        pid = cmd.stdout.strip.split("\n").first
+        cmd = shell_out!("ps --no-header -o lstart #{pid}",
+                          returns: [0, 1])
+        # raise for any error
+        fail cmd.stderr unless cmd.stderr.empty?
+        Chef::Log.warn "XXXlib ps #{cmd.stderr}, XXX #{cmd.stdout}"
+        t = cmd.stdout.strip
+        Time.parse(t) if t != ''
       end
     end
   end
