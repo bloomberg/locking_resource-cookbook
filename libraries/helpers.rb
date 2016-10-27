@@ -71,7 +71,7 @@ module LockingResource
         pieces = path.split(File::SEPARATOR)
         pieces = pieces.map.with_index do |p, i|
           # create an ascending list of paths e.g.
-          # ["/foo", "/foo/bar", "/foo/bar/baz", etc.]
+          # ['/foo', '/foo/bar', '/foo/bar/baz', etc.]
           pieces.slice(0, i+1).join(File::SEPARATOR)
         end.select{ |p| p.length > 0 && !get_node_data(quorum_hosts, p) }
 
@@ -98,7 +98,7 @@ module LockingResource
     # service is held by a node (check the znode's data matches the string
     # provided). The input parameters are the path to the znode used to
     # restart a hadoop service, a string containing the host port values
-    # of the ZooKeeper nodes "host1:port, host2:port" and
+    # of the ZooKeeper nodes 'host1:port, host2:port' and
     # the fqdn of the host
     # Return value : true or false
     #
@@ -114,7 +114,7 @@ module LockingResource
     # Function to release the lock held by the node to restart a particular
     # hadoop service. The input parameters are the name of the path to znode
     # which was used to lock for restarting service, string containing the
-    # zookeeper host and port ("host1:port,host2:port") and the fqdn of the
+    # zookeeper host and port ('host1:port,host2:port') and the fqdn of the
     # node trying to release the lock.
     # Return value : true or false based on whether the lock release was
     #                successful or not
@@ -138,7 +138,7 @@ module LockingResource
     # Function to get the node data which is written to a particular path
     # Input parameters:
     #     quorum - 'localhost:2181' by default, comma separated
-    #                        e.g. ("zk_host1:port,sk_host2:port")
+    #                        e.g. ('zk_host1:port,sk_host2:port')
     #     path - the znode name to query
     # Return value    : The data of the node or nil
     #
@@ -153,7 +153,7 @@ module LockingResource
     # Function to get the lock creation time
     # Input parameters:
     #     quorum - 'localhost:2181' by default, comma separated
-    #                        e.g. ("zk_host1:port,sk_host2:port")
+    #                        e.g. ('zk_host1:port,sk_host2:port')
     #     path - the znode name to query
     # Return value    : A Ruby time object of the node's creation or nil
     #
@@ -171,26 +171,30 @@ module LockingResource
     #        full_cmd - boolean whether to use use 'pgrep -f' for command string
     #        user - use 'pgrep -u <user>' for search string
     #
-    # Returns: A Ruby Time object representing the eldest process's start time or nil
+    # Returns: A Ruby Time object representing the eldest process's start time
+    #          or nil
     # Note:
     # * If the process can not be found, nil is returned
     #
     # ensure VALID_PROCESS_PATTERN_OPTS matches the arguments
     # available process_start_time()
-    VALID_PROCESS_PATTERN_OPTS = {full_cmd: false, command_string: nil, user: nil}
+    VALID_PROCESS_PATTERN_OPTS = {full_cmd: false,
+                                  command_string: nil,
+                                  user: nil}
     def process_start_time(full_cmd: false, command_string: nil, user: nil)
       require 'time'
       
-      raise "Need a command_string or user to search for:" if \
+      raise 'Need a command_string or user to search for:' if \
         (command_string.nil? and user.nil?)
       # pgrep options mapped to command arguments
       cmd_opts = [(user and %Q{-u "#{user}"}),
-                  (full_cmd and "-f"),
+                  (full_cmd and '-f'),
                   (command_string and %Q{"#{command_string}"})].\
         select{|m| m}.join(' ')
       cmd = shell_out!("pgrep -o #{cmd_opts}", returns: [0, 1])
       # raise for any error
-      Chef::Log.warn "XXXlib pgrep -o #{cmd_opts}; #{cmd.stderr}, XXX #{cmd.stdout}"
+      Chef::Log.debug "process_start_time() pgrep -o #{cmd_opts}:"\
+                      "#{cmd.stderr}, #{cmd.stdout}"
       fail cmd.stderr unless cmd.stderr.empty?
 
       if cmd.stdout.strip.empty?
@@ -201,7 +205,7 @@ module LockingResource
                           returns: [0, 1])
         # raise for any error
         fail cmd.stderr unless cmd.stderr.empty?
-        Chef::Log.warn "XXXlib ps #{cmd.stderr}, XXX #{cmd.stdout}"
+        Chef::Log.debug "process_start_time() ps:#{cmd.stdout}, #{cmd.stderr}"
         t = cmd.stdout.strip
         Time.parse(t) if t != ''
       end
