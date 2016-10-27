@@ -10,10 +10,6 @@ default[:locking_resource][:restart_lock][:root] = '/lock'
 default[:locking_resource][:restart_lock_acquire][:sleep_time] = 0.25
 # Timeout in seconds before failing to acquire lock
 default[:locking_resource][:restart_lock_acquire][:timeout] = 30
-# Flag to set whether the HDFS datanode restart process was successful or not
-default[:locking_resource][:hadoop_hdfs_datanode][:restart_failed] = false
-# Attribute to save the time when HDFS datanode restart process failed
-default[:locking_resource][:hadoop_hdfs_datanode][:restart_failed_time] = ''
 # Flag to control whether automatic restarts due to config changes need to be
 # skipped for e.g. if ZK quorum is down or if the recipes need to be run in a
 # non ZK env
