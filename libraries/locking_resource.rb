@@ -18,7 +18,7 @@ class Chef
     attribute(:name, kind_of: String)
     attribute(:resource, kind_of: String, required: true)
     attribute(:perform, kind_of: Symbol, required: true)
-    attribute(:timeout, kind_of: Integer, default: 30)
+    attribute(:timeout, kind_of: Integer, default: lazy { node[:locking_resource][:restart_lock_acquire][:timeout] })
     attribute(:process_pattern, option_collector: true)
     attribute(:lock_data, kind_of: String, default: lazy { node[:fqdn] })
 
@@ -40,7 +40,6 @@ class Chef
         # https://zookeeper.apache.org/doc/trunk/zookeeperProgrammers.html#ch_zkDataModel
         lock_path = ::File.join(node[:locking_resource][:restart_lock][:root],
                               new_resource.name.gsub(' ', ':'))
-        lock_acquire_timeout = node[:locking_resource][:restart_lock_acquire][:timeout]
 
         unless node[:locking_resource][:skip_restart_coordination]
           zk_hosts = parse_zk_hosts(node[:locking_resource][:zookeeper_servers])
@@ -53,7 +52,7 @@ class Chef
           # object or connection if we interrupt it -- thus we trust the
           # zookeeper object to not wantonly hang
           start_time = Time.now
-          while !got_lock && (start_time + lock_acquire_timeout) >= Time.now
+          while !got_lock && (start_time + new_resource.timeout) >= Time.now
             got_lock = create_node(zk_hosts, lock_path, new_resource.lock_data) and \
               Chef::Log.info 'Acquired new lock'
             sleep(node[:locking_resource][:restart_lock_acquire][:sleep_time])

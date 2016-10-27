@@ -18,6 +18,8 @@ lock_path = ::File.join(node[:locking_resource][:restart_lock][:root],
 zk_hosts = parse_zk_hosts(node[:locking_resource][:zookeeper_servers])
 node.run_state['thread_hdl'] = nil
 node.run_state['times'] = {}
+# Let us timeout much quicker for the sake of testing
+override_timeout = 5
 
 # Create the resource for us to serialize
 ruby_block lock_resource do
@@ -58,8 +60,8 @@ ruby_block 'Run Locking Resource and Unwind Colliding Lock' do
         Chef::Log.warn \
           "#{node.run_state['times']['unwind_sleep_time']}: Sleeping"
 
-        # sleep all but 5 seconds of the default timeout
-        sleep(node[:locking_resource][:restart_lock_acquire][:timeout] - 5)
+        # sleep all but 2 seconds of the default timeout
+        sleep(override_timeout - 2)
 
         # release lock
         node.run_state['times']['unwind_wake_time'] = Time.now
@@ -87,6 +89,7 @@ end
 locking_resource "ruby_block[#{lock_resource}]" do
   resource "ruby_block[#{lock_resource}]"
   perform :run
+  timeout override_timeout
   action :serialize
 end
 
@@ -95,7 +98,7 @@ ruby_block 'Time after locking resource' do
   block do
     node.run_state['times']['after_locking_resource'] = Time.now
     Chef::Log.warn "Time after locking resource (should be " \
-    "#{node[:locking_resource][:restart_lock_acquire][:timeout] - 5} " \
+    "#{override_timeout - 2} " \
     "seconds after last print) " +
     node.run_state['times']['after_locking_resource'].to_s
 
