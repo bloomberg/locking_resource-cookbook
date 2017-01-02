@@ -1,16 +1,16 @@
 ## Description
-The locking resource cookbook provides resources to lock various other Chef resources. This can be used to  prevent a distributed environment from having multiple machines simultaneously executing a particular resouce. 
+The locking resource cookbook provides resources to lock various other Chef resources. This can be used to  prevent a distributed environment from having multiple machines simultaneously executing a particular resource. 
 
 Use cases envisioned:
 * Prevent stampeding herds knocking over a particularly fragile end-point by serializing access
 * Prevent all instances of a service going down en mass during configuration updates
-* Communicate state if a particular service is not coming back up (preventing a toxic-configuration from causing cascading failures) and still verifiying if a process is restarted outside of Chef using process start time.
+* Communicate state if a particular service is not coming back up (preventing a toxic-configuration from causing cascading failures) and still verifying if a process is restarted outside of Chef using process start time.
 
 ## Requirements
-The Zookeeper gem and a Zookeeper cluster is required. While envisioned to use a generic synchronous state enginer, today Zookeeper is used for all lock coordination.
+The Zookeeper gem and a Zookeeper cluster is required. While envisioned to use a generic synchronous state engineer, today Zookeeper is used for all lock coordination.
 
 ## Attributes
-* `node[:locking_resource][:restart_lock][:root]` - Zookeeper namespace underwhich all locks are created
+* `node[:locking_resource][:restart_lock][:root]` - Zookeeper namespace under which all locks are created
 * `node[:locking_resource][:restart_lock_acquire][:sleep_time]` - Sleep time in (fractions-of) seconds between tries to acquire a lock for restart
 * `node[:locking_resource][:restart_lock_acquire][:timeout]` - Timeout in seconds before failing to acquire lock
 * `node[:locking_resource][:skip_restart_coordination]` - Flag to skip attempting lock coordination (will just assume lock was acquired and not block)
@@ -43,7 +43,7 @@ Will run the requested action every Chef run as long as a lock can be acquired; 
 
 Contributing
 ============
-Contributions are welecomed! This cookbook tries to have rigerous testing to verify that locks are held and released as expected. The current process for kicking these off on a machine with ChefDK is:
+Contributions are welcomed! This cookbook tries to have rigorous testing to verify that locks are held and released as expected. The current process for kicking these off on a machine with ChefDK is:
 ````
 $ bundler --path=vendor/cache
 $ berks vendor
