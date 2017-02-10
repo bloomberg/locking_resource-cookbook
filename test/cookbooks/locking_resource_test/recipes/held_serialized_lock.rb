@@ -1,6 +1,4 @@
-node.default['zookeeper']['service_style'] = 'runit'
 include_recipe 'zookeeper::default'
-include_recipe 'runit'
 include_recipe 'zookeeper::service'
 include_recipe 'locking_resource::default'
 Chef::Recipe.send(:include, LockingResource::Helper)

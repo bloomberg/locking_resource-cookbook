@@ -45,7 +45,8 @@ Contributing
 ============
 Contributions are welcomed! This cookbook tries to have rigorous testing to verify that locks are held and released as expected. The current process for kicking these off on a machine with ChefDK is:
 ````
-$ bundler --path=vendor/cache
+$ export PATH=/opt/chefdk/embedded/bin:$PATH
+$ bundler package --path=vendor/cache
 $ berks vendor
 $ bundler exec rspec
 $ kitchen converge '.*'

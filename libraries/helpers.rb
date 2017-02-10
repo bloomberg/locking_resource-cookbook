@@ -11,6 +11,58 @@ module LockingResource
     end
 
     #
+    # Set some state to flag that a locking resource needs to be re-run
+    # Inputs:
+    #   node - A node object which we can update
+    #   path - A lock path string to use for saving the rerun state
+    # Side-effect: writes a Time object and failure count to the node object if
+    #              previously unset otherwise increments failure count
+    # Returns: A hash with the following keys
+    #       "time" : Time object stored in the node object
+    #       "fails" : number of times this lock has failed
+    #  
+    def need_rerun(node, path)
+      failed_locks = Proc.new { node[:locking_resource][:failed_locks] }
+      failed_locks_set = Proc.new do |key, val|
+        node.normal[:locking_resource][:failed_locks][key] = val
+      end
+      if failed_locks.call.fetch(path, false)
+        failed_locks_set.call(path, {
+          "time" => failed_locks.call[path]["time"],
+          "fails" => failed_locks.call[path]["fails"] + 1 })
+      else
+        failed_locks_set.call(path,
+                              { "time" => Time.now, "fails" => 1 })
+      end
+      puts "XXX #{failed_locks.call[path]}"
+      return failed_locks.call[path]
+    end
+
+    #
+    # Returns the rerun time saved in the node object
+    # Inputs:
+    #   node - A node object which we can update
+    #   path - A lock path string to use for saving the rerun state
+    # Returns: returns the Time object from the node object or nil if not set
+    #
+    def rerun_time?(node, path)
+      puts "XXX rerun_time #{path}"
+      node[:locking_resource][:failed_locks].fetch(
+        path, {"time" => nil})["time"]
+    end
+
+    #
+    # Clears out the Time object saved in the node object
+    # Inputs:
+    #   node - A node object which we can update
+    #   path - A lock path string to use for saving the rerun state
+    # Returns: returns the Time object from the node object or nil if not set
+    #
+    def clear_rerun(node, path)
+      node.normal[:locking_resource][:failed_locks].delete(path)
+    end
+
+    #
     # Run an arbitrary block of code against a Zookeeper connection
     # Inputs:
     #     quorum - 'localhost:2181' by default, comma separated
@@ -19,27 +71,30 @@ module LockingResource
     # Return value : return of the block
     #                or nil if connection can not be estabilished
     #
-    def run_zk_block(quorum_hosts = 'localhost:2181', &block)
-      require 'zookeeper'
+    def run_zk_block(quorum_hosts, &block)
       val = nil
+      if !quorum_hosts
+         raise ArgumentError, "Need non nil quorum_hosts"
+      end
+      require 'zookeeper'
       begin
         zk = Zookeeper.new(quorum_hosts)
         unless zk.connected?
-          fail LockingResourceException,
+          fail ::LockingResource::Helper::LockingResourceException,
             "LockingResource: unable to connect to ZooKeeper quorum " \
             "#{quorum_hosts}"
         end
         val = block.call(zk)
-      rescue LockingResourceException
+      rescue ::LockingResource::Helper::LockingResourceException => e
+        Chef::Log.warn e.message
         raise
       rescue StandardError => e
         Chef::Log.warn e.message
+        raise
       # make sure we always try to clean-up
       ensure
         begin
           zk.close unless (zk.nil? || zk.closed?)
-        rescue LockingResourceException
-          raise
         rescue StandardError => e
           Chef::Log.warn e.message
         end
@@ -62,7 +117,7 @@ module LockingResource
     #     data - the data to put in the znode
     # Return value : true or false
     #
-    def create_node(quorum_hosts = 'localhost:2181', path, data)
+    def create_node(quorum_hosts, path, data)
       # walk tree creating any necessary znodes:
       unless get_node_data(quorum_hosts, path)
         Chef::Log.debug "Did not find node: #{path}"
@@ -80,7 +135,7 @@ module LockingResource
           pieces.slice(0, pieces.length-1).each do |p|
             ret = zk.create(path: p, data: '')
             Chef::Log.debug "Tried to create node: #{p}; #{ret}"
-            fail LockingResourceException,
+            fail ::LockingResource::Helper::LockingResourceException,
               "Failed to create: #{p}" unless ret[:rc] == 0
           end
         end
@@ -102,7 +157,7 @@ module LockingResource
     # the fqdn of the host
     # Return value : true or false
     #
-    def lock_matches?(quorum_hosts='localhost:2181', path, data)
+    def lock_matches?(quorum_hosts, path, data)
       run_zk_block(quorum_hosts) do |zk|
         ret = zk.get(path: path)
         val = ret[:data]
@@ -121,12 +176,12 @@ module LockingResource
     # Raises: If the node does not provide correct data
     #         (and does not remove lock)
     #
-    def release_lock(quorum_hosts = 'localhost:2181', path, data)
+    def release_lock(quorum_hosts, path, data)
       run_zk_block(quorum_hosts) do |zk|
         if lock_matches?(quorum_hosts, path, data)
           ret = zk.delete(path: path)
         else
-          fail LockingResourceException,
+          fail ::LockingResource::Helper::LockingResourceException,
             'release_lock: node does not contain expected data ' \
             'not releasing the lock'
         end
@@ -142,7 +197,7 @@ module LockingResource
     #     path - the znode name to query
     # Return value    : The data of the node or nil
     #
-    def get_node_data(quorum_hosts = 'localhost:2181', path)
+    def get_node_data(quorum_hosts, path)
       run_zk_block(quorum_hosts) do |zk|
         ret = zk.get(path: path)
         ret[:data] if ret[:rc] == 0
@@ -157,7 +212,7 @@ module LockingResource
     #     path - the znode name to query
     # Return value    : A Ruby time object of the node's creation or nil
     #
-    def get_node_ctime(quorum_hosts = 'localhost:2181', path)
+    def get_node_ctime(quorum_hosts, path)
       require 'time'
       run_zk_block(quorum_hosts) do |zk|
         ret = zk.stat(path: path)
@@ -183,7 +238,7 @@ module LockingResource
                                   user: nil}
     def process_start_time(full_cmd: false, command_string: nil, user: nil)
       require 'time'
-      
+
       raise 'Need a command_string or user to search for:' if \
         (command_string.nil? and user.nil?)
       # pgrep options mapped to command arguments

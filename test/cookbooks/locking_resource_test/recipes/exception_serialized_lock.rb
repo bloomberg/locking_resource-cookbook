@@ -1,6 +1,4 @@
-node.default['zookeeper']['service_style'] = 'runit'
 include_recipe 'zookeeper::default'
-include_recipe 'runit'
 include_recipe 'zookeeper::service'
 include_recipe 'locking_resource::default'
 Chef::Recipe.send(:include, LockingResource::Helper)
@@ -8,7 +6,8 @@ Chef::Resource::RubyBlock.send(:include, LockingResource::Helper)
 
 ###
 # This recipe is designed to test the lock is held
-# if the serialized action crashes
+# if the Chef run bails out -- it has to recover from
+# letting Chef get to near death and return 0 if all tests pass
 #
 
 lock_resource = 'Dummy Resource Lock'
@@ -40,9 +39,11 @@ ruby_block 'Verify Lock Still Held' do
     Chef::Log.warn "The time after locking resource: #{now}"
     raise "Locked resource has not run before this! (#{res_run_time} < #{now})" unless res_run_time < now
     raise "Not holding lock!" unless lock_matches?(zk_hosts, lock_path, node[:fqdn])
-    (0...10).each do
-      Chef::Log.warn("ALL CHECKS PASSED!")
-    end
+    Chef::Log.warn("ALL CHECKS PASSED!")
+
+    # Since we are verifying the Chef run failed exit!(0) to bail with a zero
+    # exit status -- we should be blocked by raise()'s above -- this is ugly
+    exit!(0)
   end
   action :nothing
 end
