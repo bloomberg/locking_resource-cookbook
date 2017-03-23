@@ -2,14 +2,14 @@ require 'simplecov'
 require 'chefspec'
 require 'chefspec/berkshelf'
 
-if not defined?(Log)
+unless defined?(Log)
   require 'mixlib/log'
   class Log
     extend Mixlib::Log
   end
 end
 
-formatters = [ SimpleCov::Formatter::HTMLFormatter ]
+formatters = [SimpleCov::Formatter::HTMLFormatter]
 
 begin
   require 'simplecov-json'
@@ -37,18 +37,15 @@ RSpec.configure do |config|
   config.order = :random
 
   # run as though rspec --format documentation when passing a single spec file
-  if config.files_to_run.one?
-    config.default_formatter = 'doc'
-  end
+  config.default_formatter = 'doc' if config.files_to_run.one?
 
   config.mock_with :rspec do |mocks|
     mocks.verify_partial_doubles = true
   end
 
-  berks = Berkshelf::Berksfile.from_file('Berksfile').install()
+  Berkshelf::Berksfile.from_file('Berksfile').install
 end
 
-
 at_exit do
- ChefSpec::Coverage.report!
+  ChefSpec::Coverage.report!
 end
