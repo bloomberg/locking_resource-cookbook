@@ -48,27 +48,25 @@ class Chef
     def acquire_lock(zk_hosts, lock_path, lock_data, timeout, retry_time)
       Chef::Log.info "Acquiring lock #{lock_path}"
       # acquire lock
-      # rubocop:disable no-and-or-or
-      got_lock = lock_matches?(zk_hosts, lock_path, lock_data)\
+      # rubocop:disable 'no-and-or-or'
+      got_lock = lock_matches?(zk_hosts, lock_path, lock_data) \
         and Chef::Log.info 'Found stale lock'
-      # rubocop:enable no-and-or-or
+      # rubocop:enable 'no-and-or-or'
 
       # intentionally do not use a timeout to avoid leaving a wonky
       # zookeeper object or connection if we interrupt it -- thus we trust
       # the zookeeper object to not wantonly hang
       start_time = Time.now
       while !got_lock && (start_time + timeout) >= Time.now
-        # rubocop:disable no-and-or-or
-        got_lock = create_node(zk_hosts, lock_path, lock_data)\
+        # rubocop:disable 'no-and-or-or'
+        got_lock = create_node(zk_hosts, lock_path, lock_data) \
           and Chef::Log.info 'Acquired new lock'
-        # rubocop:enable no-and-or-or
+        # rubocop:enable 'no-and-or-or'
         sleep(retry_time)
         Chef::Log.warn "Sleeping for lock #{lock_path}"
       end
       # see if we ever got a lock -- if not record it for later
-      if !got_lock
-        Chef::Log.warn "Did not get lock #{lock_path}"
-      end
+      Chef::Log.warn "Did not get lock #{lock_path}" unless got_lock
       got_lock
     end
 
@@ -77,8 +75,10 @@ class Chef
     def action_serialize
       converge_by("serializing #{new_resource.name}") do
         r = run_context.resource_collection.resources(new_resource.resource)
-        fail "Unable to find resource #{new_resource.resource} in " \
-             'resources' unless r
+        unless r
+          raise "Unable to find resource #{new_resource.resource} in " \
+                'resources'
+        end
 
         # to avoid namespace collisions replace spaces in resource name with
         # a colon -- zookeeper's quite permissive on paths:
@@ -115,7 +115,7 @@ class Chef
           end
         else
           need_rerun(node, lock_path)
-          fail 'Failed to acquire lock for ' \
+          raise 'Failed to acquire lock for ' \
                 "LockingResource[#{new_resource.name}], path #{lock_path}"
         end
       end
@@ -125,12 +125,12 @@ class Chef
     # and the service has not restarted since we started trying to get the lock
     def action_serialize_process
       vppo = ::LockingResource::Helper::VALID_PROCESS_PATTERN_OPTS
-      raise 'Need a process pattern attribute' unless \
-        !new_resource.process_pattern.empty?
+      raise 'Need a process pattern attribute' if \
+        new_resource.process_pattern.empty?
       if Set.new(new_resource.process_pattern.keys) < \
-        Set.new(vppo.keys)
+         Set.new(vppo.keys)
         raise "Only expect options: #{vppo.keys} but got " \
-          "#{new_resource.process_pattern.keys}"
+              "#{new_resource.process_pattern.keys}"
       end
       converge_by("serializing #{new_resource.name} on process") do
         l_time = false
@@ -141,10 +141,9 @@ class Chef
 
         # convert keys from strings to symbols for process_start_time()
         start_time_arg = \
-            new_resource.process_pattern.inject({}) do |memo, (k, v)|
-          memo[k.to_sym] = v
-          memo
-        end
+          new_resource.process_pattern.each_with_object({}) do |(k, v), memo|
+            memo[k.to_sym] = v
+          end
 
         p_start = process_start_time(start_time_arg) || false
 
@@ -188,7 +187,7 @@ class Chef
                          "rerun flag time: #{r_time}; " \
                          "process restarted since lock: #{p_start}"
         end
- 
+
         # we should not get here if restarting the resource failed --
         # so clean everything up
         clear_rerun(node, lock_path)

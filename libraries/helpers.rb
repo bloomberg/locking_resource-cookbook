@@ -1,6 +1,6 @@
 module LockingResource
   module Helper
-    class LockingResourceException < Exception
+    class LockingResourceException < RuntimeError
     end
 
     include Chef::Mixin::ShellOut
@@ -18,24 +18,25 @@ module LockingResource
     # Side-effect: writes a Time object and failure count to the node object if
     #              previously unset otherwise increments failure count
     # Returns: A hash with the following keys
-    #       "time" : Time object stored in the node object
-    #       "fails" : number of times this lock has failed
-    #  
+    #       'time' : Time object stored in the node object
+    #       'fails' : number of times this lock has failed
+    #
     def need_rerun(node, path)
-      failed_locks = Proc.new { node[:locking_resource][:failed_locks] }
+      # provide a way to evaluate and set node attributes at runtime
+      failed_locks = Proc.new { node['locking_resource']['failed_locks'] }
       failed_locks_set = Proc.new do |key, val|
-        node.normal[:locking_resource][:failed_locks][key] = val
+        node.normal['locking_resource']['failed_locks'][key] = val
       end
+
       if failed_locks.call.fetch(path, false)
-        failed_locks_set.call(path, {
-          "time" => failed_locks.call[path]["time"],
-          "fails" => failed_locks.call[path]["fails"] + 1 })
-      else
         failed_locks_set.call(path,
-                              { "time" => Time.now, "fails" => 1 })
+                              'time' => failed_locks.call[path]['time'],
+                              'fails' => failed_locks.call[path]['fails'] + 1)
+      else
+        failed_locks_set.call(path, 'time' => Time.now, 'fails' => 1)
       end
-      puts "XXX #{failed_locks.call[path]}"
-      return failed_locks.call[path]
+
+      failed_locks.call[path]
     end
 
     #
@@ -46,9 +47,9 @@ module LockingResource
     # Returns: returns the Time object from the node object or nil if not set
     #
     def rerun_time?(node, path)
-      puts "XXX rerun_time #{path}"
-      node[:locking_resource][:failed_locks].fetch(
-        path, {"time" => nil})["time"]
+      node['locking_resource']['failed_locks'].fetch(
+        path, 'time' => nil
+      )['time']
     end
 
     #
@@ -59,7 +60,7 @@ module LockingResource
     # Returns: returns the Time object from the node object or nil if not set
     #
     def clear_rerun(node, path)
-      node.normal[:locking_resource][:failed_locks].delete(path)
+      node.normal['locking_resource']['failed_locks'].delete(path)
     end
 
     #
@@ -67,24 +68,22 @@ module LockingResource
     # Inputs:
     #     quorum - 'localhost:2181' by default, comma separated
     #                        e.g. ("zk_host1:port,sk_host2:port")
-    #     &block - the code to run
+    #     &bk - the code to run
     # Return value : return of the block
     #                or nil if connection can not be estabilished
     #
-    def run_zk_block(quorum_hosts, &block)
+    def run_zk_block(quorum_hosts, &bk)
       val = nil
-      if !quorum_hosts
-         raise ArgumentError, "Need non nil quorum_hosts"
-      end
+      raise ArgumentError, 'Need non nil quorum_hosts' unless quorum_hosts
       require 'zookeeper'
       begin
         zk = Zookeeper.new(quorum_hosts)
         unless zk.connected?
-          fail ::LockingResource::Helper::LockingResourceException,
-            "LockingResource: unable to connect to ZooKeeper quorum " \
-            "#{quorum_hosts}"
+          raise ::LockingResource::Helper::LockingResourceException,
+                'LockingResource: unable to connect to ZooKeeper quorum ' \
+                "#{quorum_hosts}"
         end
-        val = block.call(zk)
+        val = bk.call(zk)
       rescue ::LockingResource::Helper::LockingResourceException => e
         Chef::Log.warn e.message
         raise
@@ -94,7 +93,7 @@ module LockingResource
       # make sure we always try to clean-up
       ensure
         begin
-          zk.close unless (zk.nil? || zk.closed?)
+          zk.close unless zk.nil? || zk.closed?
         rescue StandardError => e
           Chef::Log.warn e.message
         end
@@ -124,19 +123,24 @@ module LockingResource
 
         # affect a mkdir -p equivalent
         pieces = path.split(File::SEPARATOR)
-        pieces = pieces.map.with_index do |p, i|
+        pieces = pieces.map.with_index do |_, i|
           # create an ascending list of paths e.g.
           # ['/foo', '/foo/bar', '/foo/bar/baz', etc.]
-          pieces.slice(0, i+1).join(File::SEPARATOR)
-        end.select{ |p| p.length > 0 && !get_node_data(quorum_hosts, p) }
+          pieces.slice(0, i + 1).join(File::SEPARATOR)
+        end
+        pieces = pieces.select do |p|
+          !p.empty? && !get_node_data(quorum_hosts, p)
+        end
 
         # create parent nodes
         run_zk_block(quorum_hosts) do |zk|
-          pieces.slice(0, pieces.length-1).each do |p|
+          pieces.slice(0, pieces.length - 1).each do |p|
             ret = zk.create(path: p, data: '')
             Chef::Log.debug "Tried to create node: #{p}; #{ret}"
-            fail ::LockingResource::Helper::LockingResourceException,
-              "Failed to create: #{p}" unless ret[:rc] == 0
+            unless ret[:rc].zero?
+              raise ::LockingResource::Helper::LockingResourceException,
+                    "Failed to create: #{p}"
+            end
           end
         end
       end # unless get_node_Data(quorum_hosts, parent_path)
@@ -144,7 +148,7 @@ module LockingResource
       run_zk_block(quorum_hosts) do |zk|
         ret = zk.create(path: path, data: data)
         Chef::Log.debug "Tried to create node: #{path}; #{ret}"
-        ret[:rc] == 0
+        ret[:rc].zero?
       end ? true : false
     end
 
@@ -181,11 +185,11 @@ module LockingResource
         if lock_matches?(quorum_hosts, path, data)
           ret = zk.delete(path: path)
         else
-          fail ::LockingResource::Helper::LockingResourceException,
-            'release_lock: node does not contain expected data ' \
-            'not releasing the lock'
+          raise ::LockingResource::Helper::LockingResourceException,
+                'release_lock: node does not contain expected data ' \
+                'not releasing the lock'
         end
-        true if ret[:rc] == 0
+        true if ret[:rc].zero?
       end ? true : false # ensure we catch returning nil and make it false
     end
 
@@ -200,7 +204,7 @@ module LockingResource
     def get_node_data(quorum_hosts, path)
       run_zk_block(quorum_hosts) do |zk|
         ret = zk.get(path: path)
-        ret[:data] if ret[:rc] == 0
+        ret[:data] if ret[:rc].zero?
       end
     end
 
@@ -216,7 +220,7 @@ module LockingResource
       require 'time'
       run_zk_block(quorum_hosts) do |zk|
         ret = zk.stat(path: path)
-        Time.strptime(ret[:stat].ctime.to_s, '%Q') if ret[:rc] == 0
+        Time.strptime(ret[:stat].ctime.to_s, '%Q') if ret[:rc].zero?
       end
     end
 
@@ -233,33 +237,33 @@ module LockingResource
     #
     # ensure VALID_PROCESS_PATTERN_OPTS matches the arguments
     # available process_start_time()
-    VALID_PROCESS_PATTERN_OPTS = {full_cmd: false,
-                                  command_string: nil,
-                                  user: nil}
+    VALID_PROCESS_PATTERN_OPTS = { full_cmd: false,
+                                   command_string: nil,
+                                   user: nil }.freeze
     def process_start_time(full_cmd: false, command_string: nil, user: nil)
       require 'time'
 
       raise 'Need a command_string or user to search for:' if \
-        (command_string.nil? and user.nil?)
+        command_string.nil? && user.nil?
       # pgrep options mapped to command arguments
-      cmd_opts = [(user and %Q{-u "#{user}"}),
-                  (full_cmd and '-f'),
-                  (command_string and %Q{"#{command_string}"})].\
-        select{|m| m}.join(' ')
+      cmd_opts = [(user && %(-u "#{user}")),
+                  (full_cmd && '-f'),
+                  (command_string && %("#{command_string}"))] \
+                 .select { |m| m }.join(' ')
       cmd = shell_out!("pgrep -o #{cmd_opts}", returns: [0, 1])
       # raise for any error
       Chef::Log.debug "process_start_time() pgrep -o #{cmd_opts}:"\
                       "#{cmd.stderr}, #{cmd.stdout}"
-      fail cmd.stderr unless cmd.stderr.empty?
+      raise cmd.stderr unless cmd.stderr.empty?
 
       if cmd.stdout.strip.empty?
         nil
       else
         pid = cmd.stdout.strip.split("\n").first
         cmd = shell_out!("ps --no-header -o lstart #{pid}",
-                          returns: [0, 1])
+                         returns: [0, 1])
         # raise for any error
-        fail cmd.stderr unless cmd.stderr.empty?
+        raise cmd.stderr unless cmd.stderr.empty?
         Chef::Log.debug "process_start_time() ps:#{cmd.stdout}, #{cmd.stderr}"
         t = cmd.stdout.strip
         Time.parse(t) if t != ''
