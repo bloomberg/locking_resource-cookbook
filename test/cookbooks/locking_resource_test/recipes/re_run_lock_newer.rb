@@ -13,19 +13,19 @@ Chef::Resource::RubyBlock.send(:include, LockingResource::Helper)
 #
 
 lock_resource = 'Dummy Resource One'
-lock_path = "ruby_block[#{lock_resource.gsub(' ', ':')}]"
-full_lock_path = ::File.join(node[:locking_resource][:restart_lock][:root],
+lock_path = "ruby_block[#{lock_resource.tr(' ', ':')}]"
+full_lock_path = ::File.join(node['locking_resource']['restart_lock']['root'],
                              lock_path)
-test_process = '/bin/sleep 60'                                                  
-                                                                                
-ruby_block 'Run a test process' do                                              
-  block do                                                                      
-    # make sure we wait long enough that at a one second granularity the        
-    # state times and process start times are different                         
-    sleep(2)                                                                    
-    node.run_state[:child_pid] = spawn(test_process)                            
-  end                                                                           
-end  
+test_process = '/bin/sleep 60'
+
+ruby_block 'Run a test process' do
+  block do
+    # make sure we wait long enough that at a one second granularity the
+    # state times and process start times are different
+    sleep(2)
+    node.run_state['child_pid'] = spawn(test_process)
+  end
+end
 
 locking_resource 'Clean-up state (and not run) if process newer than lock' do
   lock_name lock_path
@@ -41,8 +41,8 @@ end
 ruby_block 'Check action not run and re-run state was cleaned up' do
   block do
     raise 'Ran action and should not have!' if \
-      node.run_state[:locking_resource_test][:ran_action]
-    re_run_state = node[:locking_resource][:failed_locks][full_lock_path]
+      node.run_state['locking_resource_test']['ran_action']
+    re_run_state = node['locking_resource']['failed_locks'][full_lock_path]
     raise "Re-run state not cleaned up: #{re_run_state}" if re_run_state
   end
 end

@@ -24,26 +24,26 @@
 # Chef 11 Omnibus)
 require 'pathname'
 require 'rubygems'
-gem_path = Pathname.new(Gem.ruby).dirname.join("gem").to_s
+gem_path = Pathname.new(Gem.ruby).dirname.join('gem').to_s
 
 # build requirements for zookeeper
-%w{make patch gcc}.each do |pkg|
+%w(make patch gcc).each do |pkg|
   package pkg do
     action :nothing
   end.run_action(:install)
 end
 
-gem_package "zookeeper" do
-    gem_binary gem_path
-    version ">0.0"
-    action :nothing
+gem_package 'zookeeper' do
+  gem_binary gem_path
+  version '>0.0'
+  action :nothing
 end.run_action(:install)
 
 # work around funky umasks
-execute "correct-gem-permissions" do
-  command "find #{Gem.default_dir()} -type f -exec chmod a+r {} \\; && " +
-          "find #{Gem.default_dir()} -type d -exec chmod a+rx {} \\;"
-  user "root"
+execute 'correct-gem-permissions' do
+  command "find #{Gem.default_dir} -type f -exec chmod a+r {} \\; && " \
+          "find #{Gem.default_dir} -type d -exec chmod a+rx {} \\;"
+  user 'root'
   action :nothing
 end.run_action(:run)
 

@@ -11,9 +11,9 @@ Chef::Resource::RubyBlock.send(:include, LockingResource::Helper)
 
 lock_resource = 'Dummy Resource Lock'
 colliding_lock_data = 'This is arbitrary data'
-lock_path = ::File.join(node[:locking_resource][:restart_lock][:root],
-                        "ruby_block[#{lock_resource.gsub(' ', ':')}]")
-zk_hosts = parse_zk_hosts(node[:locking_resource][:zookeeper_servers])
+lock_path = ::File.join(node['locking_resource']['restart_lock']['root'],
+                        "ruby_block[#{lock_resource.tr(' ', ':')}]")
+zk_hosts = parse_zk_hosts(node['locking_resource']['zookeeper_servers'])
 node.run_state['thread_hdl'] = nil
 node.run_state['times'] = {}
 # Let us timeout much quicker for the sake of testing
@@ -23,7 +23,8 @@ override_timeout = 5
 ruby_block lock_resource do
   block do
     node.run_state['times'][lock_resource] = Time.now
-    Chef::Log.warn "Dummy resource ran at: #{node.run_state['times'][lock_resource]}"
+    Chef::Log.warn 'Dummy resource ran at: ' +
+                   node.run_state['times'][lock_resource].to_s
   end
   action :nothing
 end
@@ -34,17 +35,17 @@ ruby_block 'Create a Colliding Lock' do
     got_lock = false
     start_time = node.run_state['times']['acquired_colliding_lock'] = Time.now
     lock_acquire_timeout =
-      node[:locking_resource][:restart_lock_acquire][:timeout]
+      node['locking_resource']['restart_lock_acquire']['timeout']
     while !got_lock && (start_time + lock_acquire_timeout) >= Time.now
       got_lock = create_node(zk_hosts, lock_path, colliding_lock_data) and \
-            Chef::Log.warn "#{start_time}: Acquired colliding lock"
+        Chef::Log.warn "#{start_time}: Acquired colliding lock"
       sleep(0.25)
     end
   end
 end
 
 log 'Initial Time' do
-  message lazy{"The time starting is now: #{Time.now}"}
+  message lazy { "The time starting is now: #{Time.now}" }
 end
 
 # Release the blocking lock after a sleep time
@@ -63,11 +64,11 @@ ruby_block 'Run Locking Resource and Unwind Colliding Lock' do
 
         # release lock
         node.run_state['times']['unwind_wake_time'] = Time.now
-        got_lock = release_lock(zk_hosts, lock_path, colliding_lock_data) and \
+        release_lock(zk_hosts, lock_path, colliding_lock_data) and \
           Chef::Log.warn \
-          "#{node.run_state['times']['unwind_wake_time']}: " \
-          "Released colliding lock"
-      rescue ThreadError => e
+            "#{node.run_state['times']['unwind_wake_time']}: " \
+            'Released colliding lock'
+      rescue ThreadError
         raise
       end
     end
@@ -78,9 +79,9 @@ end
 ruby_block 'Time before locking resource' do
   block do
     node.run_state['times']['before_locking_resource'] = Time.now
-    Chef::Log.warn "The time before locking resource: " \
-      "#{node.run_state['times']['before_locking_resource']}"
-    end
+    Chef::Log.warn 'The time before locking resource: ' +
+                   node.run_state['times']['before_locking_resource'].to_s
+  end
 end
 
 # Try to run a serialized action
@@ -95,10 +96,10 @@ end
 ruby_block 'Time after locking resource' do
   block do
     node.run_state['times']['after_locking_resource'] = Time.now
-    Chef::Log.warn "Time after locking resource (should be " \
-    "#{override_timeout - 2} " \
-    "seconds after last print) " +
-    node.run_state['times']['after_locking_resource'].to_s
+    Chef::Log.warn 'Time after locking resource (should be ' \
+                   "#{override_timeout - 2} " \
+                   'seconds after last print) ' +
+                   node.run_state['times']['after_locking_resource'].to_s
 
     # ensure the sleep thread has cleaned up
     node.run_state['thread_hdl'].join
@@ -109,17 +110,17 @@ end
 ruby_block 'verify timings' do
   block do
     # verify the Chef run progressed while we waited to release the lock
-    raise("Chef run should have continued " \
+    raise('Chef run should have continued ' \
       "(#{node.run_state['times']['before_locking_resource']}) before lock " \
       "release thread awoke (#{node.run_state['times']['unwind_wake_time']})") \
       if node.run_state['times']['before_locking_resource'].to_f > \
-      node.run_state['times']['unwind_wake_time'].to_f
+         node.run_state['times']['unwind_wake_time'].to_f
 
     # verify the serialized resource only ran after the lock was released
-    raise("Locking resource should run " \
+    raise('Locking resource should run ' \
       "(#{node.run_state['times'][lock_resource]}) only after we unwind the" \
-      " colliding lock (#{node.run_state['times']['unwind_wake_time']})") if \
-      node.run_state['times']['unwind_wake_time'].to_f > \
-      node.run_state['times'][lock_resource].to_f
+      " colliding lock (#{node.run_state['times']['unwind_wake_time']})") \
+      if node.run_state['times']['unwind_wake_time'].to_f > \
+         node.run_state['times'][lock_resource].to_f
   end
 end
