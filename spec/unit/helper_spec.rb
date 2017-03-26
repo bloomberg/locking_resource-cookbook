@@ -16,42 +16,31 @@ describe LockingResource::Helper do
       let(:my_data) { 'my_data' }
       let(:exception_str) { 'Error from test - should be logged' }
     
-      it 'swallows exception and returns false' do
-        # first let path detection run 
-        expect(dummy_class).to receive(:get_node_data). \
-          with(quorum_hosts=hosts, path=node_path) { "" }
-        # fail second zookeeper creation
-        expect(Zookeeper).to receive(:new).and_raise(exception_str)
-        expect(Chef::Log).to receive(:warn).with(exception_str)
-        expect(dummy_class.create_node(quorum_hosts=hosts, path=node_path,
-          data=my_data)).to match(false)
-      end
-    
       it 'creates necessary path and returns true' do
         expect(dummy_class).to receive(:get_node_data). \
-          with(quorum_hosts=hosts, path=node_path) { false }
+          with(hosts, node_path) { false }
         expect(dummy_class).to receive(:get_node_data). \
-          with(quorum_hosts=hosts, path=::File.dirname(node_path)) { false }
+          with(hosts, File.dirname(node_path)) { false }
         expect(dummy_class).to receive(:get_node_data). \
-          with(quorum_hosts=hosts, path=node_path) { false }
+          with(hosts, node_path) { false }
         dbl = double({ connected?: true,
                        closed?: true })
         expect(Zookeeper).to receive(:new) { dbl }
         expect(dbl).to receive(:create).with({:path => ::File.dirname(node_path), :data => ''}).exactly(1).times{ {:rc => 0} }
         expect(Zookeeper).to receive(:new) { dbl }
         expect(dbl).to receive(:create).with({:path => node_path, :data => my_data}).exactly(1).times{{:rc => 0}}
-        expect(dummy_class.create_node(quorum_hosts=hosts, path=node_path,
-          data=my_data)).to match(true)
+        expect(dummy_class.create_node(hosts, node_path,
+          my_data)).to match(true)
       end
 
       it 'swallows exception and returns true' do
         # create_node tests for mkdir -p equiv
         expect(dummy_class).to receive(:get_node_data). \
-          with(quorum_hosts=hosts, path=node_path) { false }
+          with(hosts, node_path) { false }
         expect(dummy_class).to receive(:get_node_data). \
-          with(quorum_hosts=hosts, path=::File.dirname(node_path)) { false }
+          with(hosts, File.dirname(node_path)) { false }
         expect(dummy_class).to receive(:get_node_data). \
-          with(quorum_hosts=hosts, path=node_path) { false }
+          with(hosts, node_path) { false }
         # create nodes for mkdir -p equiv
         dbl = double({ connected?: true,
                        create: {"rc".to_sym => 0},
@@ -65,19 +54,19 @@ describe LockingResource::Helper do
         expect(Chef::Log).to receive(:warn).with(exception_str)
         expect(dbl).to receive(:closed?).and_raise(exception_str)
         expect(Chef::Log).to receive(:warn).with(exception_str)
-        expect(dummy_class.create_node(quorum_hosts=hosts, path=node_path,
-          data=my_data)).to match(true)
+        expect(dummy_class.create_node(hosts, node_path,
+          my_data)).to match(true)
       end
     
       it 'returns true if node created' do
         expect(dummy_class).to receive(:get_node_data). \
-          with(quorum_hosts=hosts, path=node_path) { true }
+          with(hosts, node_path) { true }
         dbl = double({ connected?: true,
                    create: {"rc".to_sym => 0},
                    closed?: true })
         expect(Zookeeper).to receive(:new) { dbl }
-        expect(dummy_class.create_node(quorum_hosts=hosts, path=node_path,
-          data=my_data)).to match(true)
+        expect(dummy_class.create_node(hosts, node_path,
+          my_data)).to match(true)
       end
     end
   end 
@@ -104,8 +93,8 @@ describe LockingResource::Helper do
           times{ {:data => my_data} }
         expect(dbl).to receive(:closed?).exactly(1).times{ false }
         expect(dbl).to receive(:close).exactly(1).times
-        expect(dummy_class.lock_matches?(quorum_hosts=hosts, path=node_path,
-          data=my_data)).to match(true)
+        expect(dummy_class.lock_matches?(hosts, node_path,
+          my_data)).to match(true)
       end
     
       it 'returns false if lock does not match' do
@@ -115,20 +104,8 @@ describe LockingResource::Helper do
           times{ {:data => 'random stuff'} }
         expect(dbl).to receive(:closed?).exactly(1).times{ false }
         expect(dbl).to receive(:close).exactly(1).times
-        expect(dummy_class.lock_matches?(quorum_hosts=hosts, path=node_path,
-          data=my_data)).to match(false)
-      end
-    
-      it 'swallows an exception in Zk.get and returns false' do
-        expect(Zookeeper).to receive(:new).with(hosts).exactly(1).times{ dbl }
-        expect(dbl).to receive(:connected?).exactly(1).times{ true }
-        expect(dbl).to receive(:get).with(:path => node_path).exactly(1).times.\
-          and_raise(exception_str)
-        expect(Chef::Log).to receive(:warn).with(exception_str)
-        expect(dbl).to receive(:closed?).exactly(1).times{ false }
-        expect(dbl).to receive(:close).exactly(1).times
-        expect(dummy_class.lock_matches?(quorum_hosts=hosts, path=node_path,
-          data=my_data)).to match(false)
+        expect(dummy_class.lock_matches?(hosts, node_path,
+          my_data)).to match(false)
       end
     
       it 'swallows an exception in Zk.close and returns true' do
@@ -139,8 +116,8 @@ describe LockingResource::Helper do
         expect(dbl).to receive(:closed?).exactly(1).times{ false }
         expect(dbl).to receive(:close).exactly(1).times.and_raise(exception_str)
         expect(Chef::Log).to receive(:warn).with(exception_str)
-        expect(dummy_class.lock_matches?(quorum_hosts=hosts, path=node_path,
-          data=my_data)).to match(true)
+        expect(dummy_class.lock_matches?(hosts, node_path,
+          my_data)).to match(true)
       end
     end
   end
@@ -172,8 +149,8 @@ describe LockingResource::Helper do
           with(:path => node_path){ {"rc".to_sym => 0} }
         expect(dbl).to receive(:closed?).exactly(1).times{ false }
         expect(dbl).to receive(:close).exactly(1).times
-        expect(dummy_class.release_lock(quorum_hosts=hosts, path=node_path,
-          data=my_data)).to match(true)
+        expect(dummy_class.release_lock(hosts, node_path,
+          my_data)).to match(true)
       end
 
       it 'returns false if lock does not match' do
@@ -184,9 +161,9 @@ describe LockingResource::Helper do
         expect(dbl).to receive(:closed?).exactly(1).times{ false }
         expect(dbl).to receive(:close).exactly(1).times
         expect do
-          dummy_class.release_lock(quorum_hosts=hosts,
-                                   path=node_path,
-                                   data=my_data)
+          dummy_class.release_lock(hosts,
+                                   node_path,
+                                   my_data)
         end.to raise_error(exception_str)
       end
     end
@@ -215,7 +192,7 @@ describe LockingResource::Helper do
           exactly(1).times{ {:rc => 0, :stat => stat} }
         expect(dbl).to receive(:closed?).exactly(1).times{ false }
         expect(dbl).to receive(:close).exactly(1).times
-        expect(dummy_class.get_node_ctime(quorum_hosts=hosts, path=node_path)).\
+        expect(dummy_class.get_node_ctime(hosts, node_path)).\
           to match(Time.strptime('1476401413663', '%Q'))
       end
 
@@ -226,7 +203,7 @@ describe LockingResource::Helper do
           exactly(1).times{ {:rc => -101} }
         expect(dbl).to receive(:closed?).exactly(1).times{ false }
         expect(dbl).to receive(:close).exactly(1).times
-        expect(dummy_class.get_node_ctime(quorum_hosts=hosts, path=node_path)).\
+        expect(dummy_class.get_node_ctime(hosts, node_path)).\
           to match(nil)
       end
     end
@@ -256,7 +233,7 @@ describe LockingResource::Helper do
           exactly(1).times{ {:rc => 0, :data => my_data} }
         expect(dbl).to receive(:closed?).exactly(1).times{ false }
         expect(dbl).to receive(:close).exactly(1).times
-        expect(dummy_class.get_node_data(quorum_hosts=hosts, path=node_path)).\
+        expect(dummy_class.get_node_data(hosts, node_path)).\
           to match(my_data)
       end
 
@@ -267,7 +244,7 @@ describe LockingResource::Helper do
           exactly(1).times{ {:rc => -101} }
         expect(dbl).to receive(:closed?).exactly(1).times{ false }
         expect(dbl).to receive(:close).exactly(1).times
-        expect(dummy_class.get_node_data(quorum_hosts=hosts, path=node_path)).\
+        expect(dummy_class.get_node_data(hosts, node_path)).\
           to match(nil)
       end
     end
@@ -278,6 +255,14 @@ describe LockingResource::Helper do
       Class.new do
         include LockingResource::Helper
       end.new
+    end
+
+    context 'called without quorum_hosts' do
+      it 'raises ArgumentError' do
+        expect do
+          dummy_class.run_zk_block(nil){ puts 'Failed if you see this' }
+        end.to raise_error(ArgumentError)
+      end
     end
 
     context 'called with reasonable parameters' do
@@ -295,7 +280,7 @@ describe LockingResource::Helper do
         expect(dbl).to receive(:connected?).exactly(1).times{ true }
         expect(dbl).to receive(:closed?).exactly(1).times{ true }
         expect(
-          dummy_class.run_zk_block(quorum_hosts=hosts){ my_data }
+          dummy_class.run_zk_block(hosts){ my_data }
         ).to eq(my_data)
       end
 
@@ -304,7 +289,7 @@ describe LockingResource::Helper do
         expect(dbl).to receive(:connected?).exactly(1).times{ true }
         expect(dbl).to receive(:closed?).exactly(1).times{ true }
         expect(
-          dummy_class.run_zk_block(quorum_hosts=hosts){ }
+          dummy_class.run_zk_block(hosts){ }
         ).to eq(nil)
       end
 
@@ -314,23 +299,24 @@ describe LockingResource::Helper do
         expect(dbl).to receive(:closed?).exactly(1).times{ false }
         expect(dbl).to receive(:close).exactly(1).times
         expect do
-          dummy_class.run_zk_block(quorum_hosts=hosts){ puts 'Fail if run' }
+          dummy_class.run_zk_block(hosts){ puts 'Fail if run' }
         end.to raise_error(exception_str)
       end
 
-      it 'swallows an exception in the block and Zk.close returning nil' do
+      it 'raises an exception in the block and Zk.close raising first exception' do
         expect(Zookeeper).to receive(:new).with(hosts).exactly(1).times{ dbl }
         expect(dbl).to receive(:connected?).exactly(1).times{ true }
-        expect(Chef::Log).to receive(:warn).with(exception_str + ' Exception 1')
-        expect(dbl).to receive(:nil?).exactly(1).times.\
-          and_raise(exception_str + ' Exception 2')
-        expect(Chef::Log).to receive(:warn).with(exception_str + ' Exception 2')
-        expect(
-          dummy_class.run_zk_block(quorum_hosts=hosts) do
-            raise(exception_str + ' Exception 1')
-            'Final return fail should not be seen'
+        expect(Chef::Log).to receive(:warn).with('Exception in Block')
+        expect(dbl).to receive(:nil?).exactly(1).times{ false }
+        expect(dbl).to receive(:closed?).exactly(1).times{ false }
+        expect(dbl).to receive(:close).exactly(1).times.and_raise('Exception from close()')
+        expect(Chef::Log).to receive(:warn).with('Exception from close()')
+        expect do
+          dummy_class.run_zk_block(hosts) do
+            raise RuntimeError, 'Exception in Block'
+            'Final return should not be seen'
           end
-        ).to eq(nil)
+        end.to raise_error(RuntimeError, 'Exception in Block')
       end
 
       it 'swallows an exception in Zk.closed? and returns block result value' do
@@ -343,8 +329,8 @@ describe LockingResource::Helper do
         expect(dbl).to receive(:closed?).exactly(1).times.\
           and_raise(exception_str)
         expect(Chef::Log).to receive(:warn).with(exception_str)
-        expect(dummy_class.release_lock(quorum_hosts=hosts, path=node_path,
-          data=my_data)).to match(true)
+        expect(dummy_class.release_lock(hosts, node_path,
+          my_data)).to match(true)
       end
     end
   end
@@ -473,6 +459,75 @@ describe LockingResource::Helper do
         expect(dummy_class.new.process_start_time(full_cmd: true,
           command_string: test_command).to_i).to \
           eq(Time.parse(ps_output).to_i)
+      end
+    end
+  end
+
+  describe 'rerun functions' do
+    let(:dummy_class) do
+      Class.new do
+        include LockingResource::Helper
+      end
+    end
+
+    #def need_rerun(node, path)
+    #def rerun_time?(node, path)
+    #def clear_rerun(node, path)
+
+    context 'test node has had reruns set' do
+      let(:node) { Chef::Node.new }
+      let(:mock_time) { Time.strptime('1476401413663', '%Q') }
+      let(:path1_rerun_data) { { "time" => mock_time - 10*60, "fails" => 1 } } 
+      let(:path2_rerun_data) { { "time" => mock_time - 30*60, "fails" => 1 } } 
+      let(:path1) { 'cookbook::recipe::test_package' }
+      let(:path2) { 'cookbook::recipe::test_bash' }
+      before(:each) do
+        node.normal[:locking_resource][:failed_locks] = {
+          path1 => path1_rerun_data,
+          path2 => path2_rerun_data
+        }
+      end
+
+      it '#clear_rerun(path1) returns mock_time - 10*60' do
+        expect(dummy_class.new.clear_rerun(node, path1)).to \
+          match_array(path1_rerun_data)
+      end
+
+      it '#rerun_time?(path2) returns mock_time - 30*60' do
+        expect(dummy_class.new.rerun_time?(node, path2)).to \
+          eq(mock_time - 30*60)
+      end
+
+      it '#need_rerun(path1) returns mock_time - 10*60' do
+        allow(Time).to receive(:now).and_return(mock_time)
+        expect(dummy_class.new.need_rerun(node, path1)).to \
+          match_array({ "time" => path1_rerun_data["time"],
+                        "fails" => path1_rerun_data["fails"] + 1 })
+      end
+    end
+
+    context 'test node has not had a rerun set' do
+      let(:node) { Chef::Node.new }
+      before(:each) do
+        node.normal[:locking_resource][:failed_locks] = {}
+      end
+      let(:path1) { 'cookbook::recipe::test_package' }
+      let(:path2) { 'cookbook::recipe::test_bash' }
+      let(:mock_time) { Time.strptime('1476401413663', '%Q') }
+      let(:rerun_data) { { "time" => mock_time, "fails" => 1 } } 
+
+      it '#clear_rerun returns nil' do
+        expect(dummy_class.new.clear_rerun(node, path1)).to eq(nil)
+      end
+
+      it '#rerun_time? returns nil' do
+        expect(dummy_class.new.rerun_time?(node, path1)).to eq(nil)
+      end
+
+      it '#need_rerun returns current time' do
+        allow(Time).to receive(:now).and_return(mock_time)
+        expect(dummy_class.new.need_rerun(node, path1)).to \
+          match_array(rerun_data)
       end
     end
   end
