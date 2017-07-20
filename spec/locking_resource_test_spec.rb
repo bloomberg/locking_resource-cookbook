@@ -20,7 +20,7 @@ describe 'locking_resource_test::simple_serialized_lock' do
       allow_any_instance_of(Chef::Provider::LockingResource).to \
         receive(:lock_matches?).and_return(false)
       allow_any_instance_of(Chef::Provider::LockingResource).to \
-        receive(:create_node) 
+        receive(:create_node)
       allow_any_instance_of(Chef::Provider::LockingResource).to \
         receive(:create_node).and_return(true)
       allow_any_instance_of(Chef::Provider::LockingResource).to \
@@ -28,7 +28,6 @@ describe 'locking_resource_test::simple_serialized_lock' do
       chef_run.converge(described_recipe)
       expect(chef_run).to write_log('This is a dummy resource')
     end
-
   end
 
   context 'locking disabled' do
@@ -37,7 +36,8 @@ describe 'locking_resource_test::simple_serialized_lock' do
                                cookbook_path: cookbook_path,
                                step_into: ['locking_resource']) do |node|
         node.override[:locking_resource][:skip_restart_coordination] = true
-        node.override[:locking_resource][:zookeeper_servers] = ['localhost:2181']
+        node.override[:locking_resource][:zookeeper_servers] = \
+          ['localhost:2181']
       end
     end
 
@@ -77,7 +77,7 @@ describe 'locking_resource_test::simple_serialized_process' do
       allow_any_instance_of(Chef::Provider::LockingResource).to \
         receive(:lock_matches?).and_return(true)
       allow_any_instance_of(Chef::Provider::LockingResource).to \
-        receive(:process_start_time).and_return(Time.now-5)
+        receive(:process_start_time).and_return(Time.now - 5)
       allow_any_instance_of(Chef::Provider::LockingResource).to \
         receive(:get_node_ctime).and_return(Time.now)
       allow_any_instance_of(Chef::Provider::LockingResource).to \
@@ -101,9 +101,9 @@ describe 'locking_resource_test::simple_serialized_process' do
       allow_any_instance_of(Chef::Provider::LockingResource).to \
         receive(:lock_matches?).and_return(true)
       allow_any_instance_of(Chef::Provider::LockingResource).to \
-        receive(:process_start_time).and_return(Time.now+5)
+        receive(:process_start_time).and_return(Time.now + 5)
       allow_any_instance_of(Chef::Provider::LockingResource).to \
-        receive(:get_node_ctime).and_return(Time.now-15)
+        receive(:get_node_ctime).and_return(Time.now - 15)
       allow_any_instance_of(Chef::Provider::LockingResource).to \
         receive(:release_lock).and_return(true)
       chef_run.converge(described_recipe)
@@ -120,7 +120,8 @@ describe 'locking_resource_test::simple_serialized_process' do
 
     it 'should log if lock not present' do
       chef_run.converge(described_recipe)
-      expect(chef_run).to serialize_process_locking_resource('Test we run if process dead')
+      expect(chef_run).to \
+        serialize_process_locking_resource('Test we run if process dead')
     end
   end
 end
