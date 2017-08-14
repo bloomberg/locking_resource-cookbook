@@ -25,6 +25,10 @@ class Chef
       lazy { node['locking_resource']['zookeeper_servers'] })
     attribute(:process_pattern, option_collector: true)
     attribute(:lock_data, kind_of: String, default: lazy { node['fqdn'] })
+    # defines a grace prediod between the convergence of the wrapped resource
+    # and release of the lock, useful for coordination of restarts of certain
+    # daemons, that do not become operational immidiately after a restart
+    attribute(:release_delay, kind_of: Integer, default: 0)
 
     # XXX should validate node['locking_resource']['zookeeper_servers'] parses
   end
@@ -108,7 +112,8 @@ class Chef
             r.resolve_notification_references
             new_resource.updated_by_last_action(r.updated)
             begin
-              release_lock(zk_hosts, lock_path, new_resource.lock_data)
+              release_lock(zk_hosts, lock_path,
+                           new_resource.lock_data, release_delay)
             rescue ::LockingResource::Helper::LockingResourceException => e
               Chef::Log.warn e.message
             end
@@ -193,7 +198,8 @@ class Chef
         clear_rerun(node, lock_path)
         begin
           # release_lock will not matter if we are not holding the lock
-          release_lock(zk_hosts, lock_path, new_resource.lock_data)
+          release_lock(zk_hosts, lock_path,
+                       new_resource.lock_data, release_delay)
         rescue ::LockingResource::Helper::LockingResourceException => e
           Chef::Log.warn e.message
         end
