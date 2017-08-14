@@ -31,6 +31,7 @@ Will run the requested action every Chef run as long as a lock can be acquired
 * `:perform` - Action to perform on `:resource` when called (locked resources are often set to `:nothing` to avoid running outside of lock)
 * `:timeout` - Optional timeout override for resources which might hold a lock particularly long
 * `:lock_data` - Optional data to put in lock; (envisioned to provide ability to lock on a topology grouping e.g. a rack)
+* `:release_delay` - Optional value to indicate that the resource should sleep for a number of seconds after converging a wrapped resource (default: 0)
 
 #### `:serialize_process`
 Will run the requested action every Chef run as long as a lock can be acquired; provides extra features for a process affecting resource. Will verify that if the machine is found to be holding a stale lock and the process as restarted since the lock was taken out, the lock will be released with no action. This provides an ability for a service to fail restarting (e.g. due to an exogenous resource failure; like a disk), to take out a lock to prevent other like processes going down electively and to be cleared by an administrator (e.g. disk replaced) and for Chef to clear the condition automatically.
