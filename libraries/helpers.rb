@@ -183,13 +183,13 @@ module LockingResource
     def release_lock(quorum_hosts, path, data, delay)
       run_zk_block(quorum_hosts) do |zk|
         if lock_matches?(quorum_hosts, path, data)
+          sleep delay
           ret = zk.delete(path: path)
         else
           raise ::LockingResource::Helper::LockingResourceException,
                 'release_lock: node does not contain expected data ' \
                 'not releasing the lock'
         end
-        sleep delay
         true if ret[:rc].zero?
       end ? true : false # ensure we catch returning nil and make it false
     end
