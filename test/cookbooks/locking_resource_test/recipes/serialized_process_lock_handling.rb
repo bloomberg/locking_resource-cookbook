@@ -42,8 +42,10 @@ end
 # Create a stale lock
 ruby_block 'Create a stale lock for init process' do
   block do
+    # rubocop:disable Style/AndOr
     create_node(zk_hosts, lock_path1, node['fqdn']) and \
       Chef::Log.warn "#{Time.now}: Acquired stale lock"
+    # rubocop:enable Style/AndOr
     raise 'Did not set lock' unless lock_matches?(zk_hosts, lock_path1,
                                                   node['fqdn'])
   end
@@ -74,8 +76,10 @@ end
 # Create a stale lock and run a process after
 ruby_block 'Create a stale lock and run a command' do
   block do
+    # rubocop:disable Style/AndOr
     create_node(zk_hosts, lock_path2, node['fqdn']) and \
       Chef::Log.warn "#{Time.now}: Acquired stale lock"
+    # rubocop:enable Style/AndOr
     raise 'Did not set lock' unless lock_matches?(zk_hosts, lock_path2,
                                                   node['fqdn'])
     # make sure we wait long enough that at a one second granularity the znode

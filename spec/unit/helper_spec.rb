@@ -377,88 +377,13 @@ describe LockingResource::Helper do
                  exitstatus: 0,
                  stdout: '',
                  stderr: error_string,
-                 live_stream: ''
-                )
+                 live_stream: '')
         end.exactly(1).times
         expect do
           dummy_class.new.process_start_time(full_cmd: true,
                                              command_string: test_command)
         end.to raise_error(error_string)
       end
-
-# Can not seem to get standard out stub to work
-# Randomized with seed 15068
-#
-#LockingResource::Helper
-#  #process_start_time?
-#    process exists
-#XXX early_idx 0; PIDs: [29371, 6114]
-#XXX3 Happy run - earliest time!
-#XXX early_idx 0; PIDs: [29371, 6114]
-#XXX0 return_stdout Arg: pgrep -f "my command"
-#XXX1 pgrep output: 29371
-#6114
-#XXXlib pgrep , XXX 29371
-#6114
-#XXX3 Happy run - earliest time!
-#XXX early_idx 0; PIDs: [29371, 6114]
-#XXX0 return_stdout Arg: ps --no-header -o lstart 29371
-#XXX1 Returning early
-#XXXlib ps , XXX Tue Jul 12 14:38:34 2016
-#XXX3 Happy run - earliest time!
-#XXX early_idx 0; PIDs: [29371, 6114]
-#XXX0 return_stdout Arg: ps --no-header -o lstart 6114
-#XXX1 Returning late
-#XXXlib ps , XXX Sat Jul 30 18:48:45 2016
-#      returns the earliest time
-#XXX early_idx ; PIDs: []
-#Early idx:
-#      raises under ps error (FAILED - 1)
-#
-#Failures:
-#
-#  1) LockingResource::Helper#process_start_time? process exists raises under ps error
-#     Failure/Error:
-#       expect { dummy_class.new.process_start_time(command_string) }.to \
-#         raise_error(error_string)
-#
-#       expected Exception with "TEST: We got an error", got #<NoMethodError: undefined method `+' for nil:NilClass> with backtrace:
-#         # ./spec/unit/helper_spec.rb:64:in `block (5 levels) in <top (required)>'
-#         # ./libraries/helpers.rb:175:in `process_start_time'
-#         # ./spec/unit/helper_spec.rb:80:in `block (5 levels) in <top (required)>'
-#         # ./spec/unit/helper_spec.rb:80:in `block (4 levels) in <top (required)>'
-#     # ./spec/unit/helper_spec.rb:80:in `block (4 levels) in <top (required)>'
-#
-
-#     it 'raises under ps error' do
-#       puts "XXX early_idx #{early_idx}; PIDs: #{pids}"
-#       # we need to use and_wrap_original since we mutate the double based
-#       # on the argument passed in per
-#       # https://www.relishapp.com/rspec/rspec-mocks/v/3-2/docs/
-#       #         configuring-responses/wrapping-the-original-implementation
-#       counter = 1
-#       puts "Early idx: #{rand(0..pids.length-1)}"
-#       expect(Mixlib::ShellOut).to receive(:new).\
-#                                and_wrap_original do |orig, arg|
-#         puts "XXX2 Expected #{early_idx + 1}; #{counter}"
-#         counter += 1
-#         puts "XXX2 shellout arg: #{arg}|"
-#         puts "XXX2 shellout pgrep: #{return_stdout(arg)}|" if arg.start_with?('pgrep')
-#         puts "XXX2 shellout ps: #{return_stdout(arg)}|" if arg.start_with?('ps')
-#         puts "XXX2 expected fail pid index: #{early_idx}|"
-#         double({ run_command: nil,
-#           error!: (arg.start_with?('ps') && \
-#                     arg.end_with?(pids[early_idx])) ? error_string : '',
-#           exitstatus: 0,
-#           stdout: return_stdout(arg),
-#           stderr: (arg.start_with?('ps') && \
-#                     arg.end_with?(pids[early_idx])) ? error_string : '',
-#           live_stream: ''
-#         })
-#       end
-#       expect { dummy_class.new.process_start_time(command_string) }.to \
-#         raise_error(error_string)
-#     end
 
       it 'returns the earliest time' do
         expect(Mixlib::ShellOut).to receive(:new) do |arg|
@@ -467,12 +392,11 @@ describe LockingResource::Helper do
                  exitstatus: 0,
                  stdout: return_stdout(arg),
                  stderr: '',
-                 live_stream: ''
-                )
+                 live_stream: '')
         end.exactly(2).times
         expect(dummy_class.new.process_start_time(
-          full_cmd: true, command_string: test_command).to_i).to \
-            eq(Time.parse(ps_output).to_i)
+          full_cmd: true, command_string: test_command
+        ).to_i).to eq(Time.parse(ps_output).to_i)
       end
     end
   end
@@ -483,10 +407,6 @@ describe LockingResource::Helper do
         include LockingResource::Helper
       end
     end
-
-    #def need_rerun(node, path)
-    #def rerun_time?(node, path)
-    #def clear_rerun(node, path)
 
     context 'test node has had reruns set' do
       let(:node) { Chef::Node.new }

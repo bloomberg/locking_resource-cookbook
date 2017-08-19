@@ -23,8 +23,8 @@ module LockingResource
     #
     def need_rerun(node, path)
       # provide a way to evaluate and set node attributes at runtime
-      failed_locks = Proc.new { node['locking_resource']['failed_locks'] }
-      failed_locks_set = Proc.new do |key, val|
+      failed_locks = proc { node['locking_resource']['failed_locks'] }
+      failed_locks_set = proc do |key, val|
         node.normal['locking_resource']['failed_locks'][key] = val
       end
 
@@ -145,11 +145,12 @@ module LockingResource
         end
       end # unless get_node_Data(quorum_hosts, parent_path)
 
-      run_zk_block(quorum_hosts) do |zk|
+      rc = run_zk_block(quorum_hosts) do |zk|
         ret = zk.create(path: path, data: data)
         Chef::Log.debug "Tried to create node: #{path}; #{ret}"
         ret[:rc].zero?
-      end ? true : false
+      end
+      rc ? true : false # ensure we catch returning nil and make it false
     end
 
     #
@@ -162,11 +163,12 @@ module LockingResource
     # Return value : true or false
     #
     def lock_matches?(quorum_hosts, path, data)
-      run_zk_block(quorum_hosts) do |zk|
+      rc = run_zk_block(quorum_hosts) do |zk|
         ret = zk.get(path: path)
         val = ret[:data]
         true if val == data
-      end ? true : false
+      end
+      rc ? true : false # ensure we catch returning nil and make it false
     end
 
     #
@@ -181,7 +183,7 @@ module LockingResource
     #         (and does not remove lock)
     #
     def release_lock(quorum_hosts, path, data)
-      run_zk_block(quorum_hosts) do |zk|
+      rc = run_zk_block(quorum_hosts) do |zk|
         if lock_matches?(quorum_hosts, path, data)
           ret = zk.delete(path: path)
         else
@@ -190,7 +192,8 @@ module LockingResource
                 'not releasing the lock'
         end
         true if ret[:rc].zero?
-      end ? true : false # ensure we catch returning nil and make it false
+      end
+      rc ? true : false # ensure we catch returning nil and make it false
     end
 
     #

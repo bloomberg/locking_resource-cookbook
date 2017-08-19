@@ -110,17 +110,19 @@ end
 ruby_block 'verify timings' do
   block do
     # verify the Chef run progressed while we waited to release the lock
-    raise('Chef run should have continued ' \
-      "(#{node.run_state['times']['before_locking_resource']}) before lock " \
-      "release thread awoke (#{node.run_state['times']['unwind_wake_time']})") \
-      if node.run_state['times']['before_locking_resource'].to_f > \
-         node.run_state['times']['unwind_wake_time'].to_f
+    if node.run_state['times']['before_locking_resource'].to_f > \
+       node.run_state['times']['unwind_wake_time'].to_f
+      raise('Chef run should have continued ' \
+        "(#{node.run_state['times']['before_locking_resource']}) before lock " \
+        "release thread awoke (#{node.run_state['times']['unwind_wake_time']})")
+    end
 
     # verify the serialized resource only ran after the lock was released
-    raise('Locking resource should run ' \
-      "(#{node.run_state['times'][lock_resource]}) only after we unwind the" \
-      " colliding lock (#{node.run_state['times']['unwind_wake_time']})") \
-      if node.run_state['times']['unwind_wake_time'].to_f > \
-         node.run_state['times'][lock_resource].to_f
+    if node.run_state['times']['unwind_wake_time'].to_f > \
+       node.run_state['times'][lock_resource].to_f
+      raise('Locking resource should run ' \
+        "(#{node.run_state['times'][lock_resource]}) only after we unwind the" \
+        " colliding lock (#{node.run_state['times']['unwind_wake_time']})")
+    end
   end
 end

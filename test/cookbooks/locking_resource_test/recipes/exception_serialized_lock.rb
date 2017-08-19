@@ -38,8 +38,10 @@ ruby_block 'Verify Lock Still Held' do
     res_run_time = node.run_state['times'][lock_resource]
     now = Time.now
     Chef::Log.warn "The time after locking resource: #{now}"
-    raise 'Locked resource has not run before this!' \
-      "(#{res_run_time} < #{now})" unless res_run_time < now
+    unless res_run_time < now
+      raise 'Locked resource has not run before this!' \
+         "(#{res_run_time} < #{now})"
+    end
     raise 'Not holding lock!' unless \
       lock_matches?(zk_hosts, lock_path, node['fqdn'])
     Chef::Log.warn('ALL CHECKS PASSED!')

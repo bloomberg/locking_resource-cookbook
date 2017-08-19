@@ -48,20 +48,20 @@ class Chef
     def acquire_lock(zk_hosts, lock_path, lock_data, timeout, retry_time)
       Chef::Log.info "Acquiring lock #{lock_path}"
       # acquire lock
-      # rubocop:disable 'no-and-or-or'
+      # rubocop:disable Style/AndOr
       got_lock = lock_matches?(zk_hosts, lock_path, lock_data) \
         and Chef::Log.info 'Found stale lock'
-      # rubocop:enable 'no-and-or-or'
+      # rubocop:enable Style/AndOr
 
       # intentionally do not use a timeout to avoid leaving a wonky
       # zookeeper object or connection if we interrupt it -- thus we trust
       # the zookeeper object to not wantonly hang
       start_time = Time.now
       while !got_lock && (start_time + timeout) >= Time.now
-        # rubocop:disable 'no-and-or-or'
+        # rubocop:disable Style/AndOr
         got_lock = create_node(zk_hosts, lock_path, lock_data) \
           and Chef::Log.info 'Acquired new lock'
-        # rubocop:enable 'no-and-or-or'
+        # rubocop:enable Style/AndOr
         sleep(retry_time)
         Chef::Log.warn "Sleeping for lock #{lock_path}"
       end
