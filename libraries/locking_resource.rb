@@ -113,7 +113,7 @@ class Chef
             new_resource.updated_by_last_action(r.updated)
             begin
               release_lock(zk_hosts, lock_path,
-                           new_resource.lock_data, release_delay)
+                           new_resource.lock_data, new_resource.release_delay)
             rescue ::LockingResource::Helper::LockingResourceException => e
               Chef::Log.warn e.message
             end
@@ -199,7 +199,7 @@ class Chef
         begin
           # release_lock will not matter if we are not holding the lock
           release_lock(zk_hosts, lock_path,
-                       new_resource.lock_data, release_delay)
+                       new_resource.lock_data, new_resource.release_delay)
         rescue ::LockingResource::Helper::LockingResourceException => e
           Chef::Log.warn e.message
         end
