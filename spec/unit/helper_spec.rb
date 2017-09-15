@@ -154,7 +154,7 @@ describe LockingResource::Helper do
         expect(dbl).to receive(:closed?).exactly(1).times { false }
         expect(dbl).to receive(:close).exactly(1).times
         expect(dummy_class.release_lock(hosts, node_path,
-                                        my_data)).to match(true)
+                                        my_data, 0)).to match(true)
       end
 
       it 'returns false if lock does not match' do
@@ -167,7 +167,7 @@ describe LockingResource::Helper do
         expect do
           dummy_class.release_lock(hosts,
                                    node_path,
-                                   my_data)
+                                   my_data, 0)
         end.to raise_error(exception_str)
       end
     end
@@ -335,7 +335,7 @@ describe LockingResource::Helper do
           .and_raise(exception_str)
         expect(Chef::Log).to receive(:warn).with(exception_str)
         expect(dummy_class.release_lock(hosts, node_path,
-          my_data)).to match(true)
+          my_data, 0)).to match(true)
       end
     end
   end
