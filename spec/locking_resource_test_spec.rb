@@ -1,19 +1,17 @@
 require 'chefspec'
+require 'spec_helper'
 
-cookbook_path = File.join(File.expand_path(Dir.pwd), 'berks-cookbooks')
-
+cookbook_path = File.join(File.expand_path(Dir.pwd), 'vendor/cookbooks')
 describe 'locking_resource_test::simple_serialized_lock' do
   require_relative '../libraries/locking_resource.rb'
 
-  context 'default configuration' do
-    let :chef_run do
-      ChefSpec::SoloRunner.new(platform: 'ubuntu', version: '12.04',
-                               cookbook_path: cookbook_path,
-                               step_into: ['locking_resource']) do |node|
-        node.automatic[:fqdn] = 'test_host'
-      end
-    end
+  let :chef_run do
+    ChefSpec::SoloRunner.new(platform: 'ubuntu', version: '14.04',
+                             cookbook_path: cookbook_path)
+    node.automatic['fqdn'] = 'test_host'
+  end
 
+  context 'default configuration' do
     it 'should log if lock uncontested' do
       allow_any_instance_of(Chef::Provider::LockingResource).to \
         receive(:lock_matches?)
@@ -32,11 +30,11 @@ describe 'locking_resource_test::simple_serialized_lock' do
 
   context 'locking disabled' do
     let :chef_run do
-      ChefSpec::SoloRunner.new(platform: 'ubuntu', version: '12.04',
+      ChefSpec::SoloRunner.new(platform: 'ubuntu', version: '14.04',
                                cookbook_path: cookbook_path,
                                step_into: ['locking_resource']) do |node|
-        node.override[:locking_resource][:skip_restart_coordination] = true
-        node.override[:locking_resource][:zookeeper_servers] = \
+        node.override['locking_resource']['skip_restart_coordination'] = true
+        node.override['locking_resource']['zookeeper_servers'] = \
           ['localhost:2181']
       end
     end
@@ -49,7 +47,7 @@ describe 'locking_resource_test::simple_serialized_lock' do
 
   context 'verify matcher' do
     let :chef_run do
-      ChefSpec::SoloRunner.new(platform: 'ubuntu', version: '12.04',
+      ChefSpec::SoloRunner.new(platform: 'ubuntu', version: '14.04',
                                cookbook_path: cookbook_path) do |node|
       end
     end
@@ -66,7 +64,7 @@ describe 'locking_resource_test::simple_serialized_process' do
 
   context 'default configuration' do
     let :chef_run do
-      ChefSpec::SoloRunner.new(platform: 'ubuntu', version: '12.04',
+      ChefSpec::SoloRunner.new(platform: 'ubuntu', version: '14.04',
                                cookbook_path: cookbook_path,
                                step_into: ['locking_resource']) do |node|
         node.automatic['fqdn'] = 'test_host'
@@ -113,7 +111,7 @@ describe 'locking_resource_test::simple_serialized_process' do
 
   context 'verify matcher' do
     let :chef_run do
-      ChefSpec::SoloRunner.new(platform: 'ubuntu', version: '12.04',
+      ChefSpec::SoloRunner.new(platform: 'ubuntu', version: '14.04',
                                cookbook_path: cookbook_path) do |node|
       end
     end

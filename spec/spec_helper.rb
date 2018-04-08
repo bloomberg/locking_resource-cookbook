@@ -2,6 +2,8 @@ require 'simplecov'
 require 'chefspec'
 require 'chefspec/berkshelf'
 
+# We call out to log in the code,
+# let us have a mock handy
 unless defined?(Log)
   require 'mixlib/log'
   class Log
@@ -29,7 +31,7 @@ SimpleCov.start
 # Require all our libraries
 Dir['libraries/*.rb'].each { |f| require File.expand_path(f) }
 
-RSpec.configure do |config|
+RSpec.configuration do |config|
   config.color = true
   config.alias_example_group_to :describe_recipe, type: :recipe
 
@@ -43,7 +45,9 @@ RSpec.configure do |config|
     mocks.verify_partial_doubles = true
   end
 
-  Berkshelf::Berksfile.from_file('Berksfile').install
+  cookbook_path = File.join(File.expand_path(Dir.pwd), 'vendor/cookbooks')
+  berksfile = Berkshelf::Berksfile.from_file('Berksfile')
+  berksfile.install(path: cookbook_path, only: 'integration')
 end
 
 at_exit do
