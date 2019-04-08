@@ -226,9 +226,9 @@ module LockingResource
 
     #
     # Function to identify start time of a process
-    # Input: command_string - 'pgrep ' compatible process search string
-    #        full_cmd - boolean whether to use use 'pgrep -f' for command string
-    #        user - use 'pgrep -u <user>' for search string
+    # Input: command_string - pcre-compatible search string/regex
+    #        full_cmd - boolean whether to use use wide output for ps
+    #        user - use 'ps -u <user>' for search string
     #
     # Returns: A Ruby Time object representing the eldest process's start time
     #          or nil
@@ -237,22 +237,23 @@ module LockingResource
     #
     # ensure VALID_PROCESS_PATTERN_OPTS matches the arguments
     # available process_start_time()
-    VALID_PROCESS_PATTERN_OPTS = { full_cmd: false,
+    VALID_PROCESS_PATTERN_OPTS = { full_cmd: true,
                                    command_string: nil,
                                    user: nil }.freeze
-    def process_start_time(full_cmd: false, command_string: nil, user: nil)
+    def process_start_time(full_cmd: true, command_string: nil, user: nil)
       require 'time'
 
       raise 'Need a command_string or user to search for:' if \
         command_string.nil? && user.nil?
-      # pgrep options mapped to command arguments
+      # ps options mapped to command arguments
       cmd_opts = [(user && %(-u "#{user}")),
-                  (full_cmd && '-f'),
-                  (command_string && %("#{command_string}"))] \
+                  (full_cmd && '-ww -o pid,cmd' || '-o pid,comm'),
+                  (command_string &&
+                    %(| awk \'/#{command_string}/ { print $1 }\'))] \
                  .select { |m| m }.join(' ')
-      cmd = shell_out!("pgrep -o #{cmd_opts}", returns: [0, 1])
+      cmd = shell_out!("ps #{cmd_opts}", returns: [0, 1])
       # raise for any error
-      Chef::Log.debug "process_start_time() pgrep -o #{cmd_opts}:"\
+      Chef::Log.debug "process_start_time() ps #{cmd_opts}:"\
                       "#{cmd.stderr}, #{cmd.stdout}"
       raise cmd.stderr unless cmd.stderr.empty?
 
@@ -260,7 +261,7 @@ module LockingResource
         nil
       else
         pid = cmd.stdout.strip.split("\n").first
-        cmd = shell_out!("ps --no-header -o lstart #{pid}",
+        cmd = shell_out!("ps --no-headers -o lstart #{pid}",
                          returns: [0, 1])
         # raise for any error
         raise cmd.stderr unless cmd.stderr.empty?

@@ -36,7 +36,7 @@ Will run the requested action every Chef run as long as a lock can be acquired
 Will run the requested action every Chef run as long as a lock can be acquired; provides extra features for a process affecting resource. Will verify that if the machine is found to be holding a stale lock and the process as restarted since the lock was taken out, the lock will be released with no action. This provides an ability for a service to fail restarting (e.g. due to an exogenous resource failure; like a disk), to take out a lock to prevent other like processes going down electively and to be cleared by an administrator (e.g. disk replaced) and for Chef to clear the condition automatically.
 
 * `:process_pattern` - Takes a block of options to define the process to keep an eye on:
- * `full_cmd` - Boolean as to if `pgrep(1)` should use `-f` for a full command string search
+ * `full_cmd` - Boolean as to if `ps(1)` should use `-ww` for a full command string search
  * `command_string` - The process string to search for (e.g. `java`)
  * `user` - The numeric UID or ASCII username string of the user running the process
  * Only `user` or `command_string` need be supplied (both may be)
