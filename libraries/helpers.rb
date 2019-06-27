@@ -245,11 +245,15 @@ module LockingResource
 
       raise 'Need a command_string or user to search for:' if \
         command_string.nil? && user.nil?
+      # Convert to escaped regex first. Thanks, Ruby.
+      command_regex = /#{command_string}/
+      # Now, convert back to a string, including escapes
+      command_string = command_regex.inspect
       # ps options mapped to command arguments
       cmd_opts = [(user && %(-u "#{user}")),
                   (full_cmd && '-ww -o pid,cmd' || '-o pid,comm'),
                   (command_string &&
-                    %(| awk \'/#{command_string}/ { print $1 }\'))] \
+                    %(| awk \'#{command_string} { print $1 }\'))] \
                  .select { |m| m }.join(' ')
       cmd = shell_out!("ps #{cmd_opts}", returns: [0, 1])
       # raise for any error
