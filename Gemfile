@@ -5,6 +5,9 @@ ruby RUBY_VERSION
 gem 'poise'
 gem 'zookeeper'
 group :test do
+  gem 'rake'
+  gem 'rubocop'
+  gem 'foodcritic'
   gem 'berkshelf'
   gem 'chefspec'
   gem 'simplecov'

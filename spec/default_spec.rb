@@ -1,10 +1,12 @@
 require 'chefspec'
+require 'spec_helper'
 
 describe 'locking_resource::default' do
+  cookbook_path = File.join(File.expand_path(Dir.pwd), 'vendor/cookbooks')
   let :chef_run do
     ChefSpec::SoloRunner.new(platform: 'ubuntu', version: '14.04',
-                             cookbook_path: File.join(File.expand_path(Dir.pwd),
-                                                      'berks-cookbooks'))
+                             cookbook_path: cookbook_path)
+    node.automatic['fqdn'] = 'test_host'
   end
 
   it 'should serialize locking resource' do
